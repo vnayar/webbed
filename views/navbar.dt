@@ -1,0 +1,55 @@
+// A simple data pair representing navigation links.
+- struct Link { string link; string name; }
+
+// Build a top-level navigation bar.
+- void navbar(Link[] links)
+  nav.navbar.navbar-default(role='navigation')
+    .navbar-header
+      button.navbar-toggle(type='button', data-toggle='collapse', data-target='#top-navbar-collapse')
+        span.sr-only Toggle navigation
+        span.icon-bar
+        span.icon-bar
+        span.icon-bar
+      a.navbar-brand(href='#') Webbed
+    #top-navbar-collapse.collapse.navbar-collapse
+      // Draw the navigation links.
+      ul.nav.navbar-nav
+        - foreach (link ; links)
+          li.active
+            a(href='#{link.link}') #{link.name}
+
+      // A search form.
+      form.navbar-form.navbar-left(role='search')
+        .form-group
+          input.form-control(type='text', placeholder='Search')
+        button.btn.btn-default(type='submit') Submit
+
+      // Login/Logout
+      .navbar-right
+        - bool isLoggedOn = req.session && req.session.isKeySet("username");
+        .login
+          button.navbar-btn.btn.btn-success(data-toggle='modal', data-target='#login-modal')
+            - if (isLoggedOn)
+              span #{req.session["username"]}
+            - else
+              span Login
+  .logout(style="float: right; margin: 5px;")
+    - if (isLoggedOn)
+      a(href="/logout") Logout
+
+
+  #login-modal.modal.fade(tabindex="-1", role='dialog')
+    .modal-dialog
+      form.modal-content(action='/login', method='post')
+        .modal-header
+          button.close(type='button', data-dismiss='modal') &times;
+          h4.modal-title Login
+        .modal-body
+          label Username
+            input.span3(type='text', name='username', placeholder='Username')
+          label Password
+            input.span3(type='password', name='password')
+        .modal-footer
+          button.btn.btn-default(type='button', data-dismiss='modal') Close
+          button.btn.btn-primary(type='submit') Login
+      

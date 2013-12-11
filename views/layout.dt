@@ -1,0 +1,18 @@
+!!! 5
+
+html
+  head
+    link(rel='stylesheet', href='/css/bootstrap.css')
+    link(rel='stylesheet', href='/css/bootstrap-theme.css')
+    link(rel='stylesheet', href='/css/layout.css')
+    block title
+  body
+    include navbar
+    - navbar([Link("/webbed", "Webbed"), Link("/blog", "Blog")]);
+    .page-header
+      block page-header
+    .container
+      block body
+    script(src='/js/jquery-2.0.3.min.js')
+    script(src='/js/bootstrap.js')
+

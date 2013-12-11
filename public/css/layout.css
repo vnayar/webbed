@@ -1,0 +1,15 @@
+body
+{
+    background-color: wheat;
+}
+
+.logout
+{
+    float: right;
+    margin: 5px;
+}
+
+.navbar
+{
+    margin-bottom: 0px;
+}

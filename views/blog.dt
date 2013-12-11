@@ -1,0 +1,11 @@
+extends layout
+
+block title
+  title Webbed - Blog
+
+block page-header
+  h1 Example page - Blog
+
+block body
+  p Hello, World!
+

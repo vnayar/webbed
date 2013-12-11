@@ -1,0 +1,13 @@
+extends layout
+
+block title
+  title Error #{error.code} - #{error.message}
+
+block page-header
+  h1 Error #{error.code} - #{error.message}
+
+block body
+  p Error Debug Message:
+  ol
+    - foreach (line ; error.debugMessage.split("\n"))
+      li #{line}
