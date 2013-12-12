@@ -36,20 +36,8 @@
   .logout(style="float: right; margin: 5px;")
     - if (isLoggedOn)
       a(href="/logout") Logout
+    - else
+      a(data-toggle='modal', href='#adduser-modal') Add User
 
-
-  #login-modal.modal.fade(tabindex="-1", role='dialog')
-    .modal-dialog
-      form.modal-content(action='/login', method='post')
-        .modal-header
-          button.close(type='button', data-dismiss='modal') &times;
-          h4.modal-title Login
-        .modal-body
-          label Username
-            input.span3(type='text', name='username', placeholder='Username')
-          label Password
-            input.span3(type='password', name='password')
-        .modal-footer
-          button.btn.btn-default(type='button', data-dismiss='modal') Close
-          button.btn.btn-primary(type='submit') Login
-      
+  include login-modal
+  include adduser-modal
