@@ -1,23 +1,10 @@
 import vibe.d;
 import vibe.utils.validation;
-import std.random : uniform;
 import core.time : dur;
 
+static import util;
+static import db;
 
-MongoClient client;
-MongoDatabase db;
-
-string randomSalt(int length)
-{
-  string saltCharSet =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  char[] salt;
-  salt.length = length;
-  foreach (i; 0 .. length) {
-    salt[i] = saltCharSet[uniform(0, saltCharSet.length)];
-  }
-  return salt.idup;
-}
 
 void addUser(HTTPServerRequest req, HTTPServerResponse res)
 {
@@ -29,19 +16,19 @@ void addUser(HTTPServerRequest req, HTTPServerResponse res)
   // Mix the password hash with a user-specific salt.
   // This makes it difficult, even with access to the DB, to crack
   // passwords using a Rainbow Table.
-  string passwordSalt = randomSalt(32);
+  string passwordSalt = util.getRandomSalt(32);
   string passwordHash =
     generateSimplePasswordHash(req.form["password"], passwordSalt);
 
   logInfo("Creating user with passwordSalt=" ~ passwordSalt);
   logInfo("Creating user with passwordHash=" ~ passwordHash);
-  // Insert the data into the "users" collection of the database.
-  auto users = db["users"];
-  users.insert(["username" : req.form["username"],
-                "password_hash" : passwordHash,
-                "password_salt" : passwordSalt,
-                "email" : req.form["email"]
-                ]);
+  // Stick the user into the BD.
+  db.addDBUser(
+            db.User(
+                 req.form["username"],
+                 passwordHash,
+                 passwordSalt,
+                 req.form["email"]));
   logInfo("User successfully created!");
   res.redirect("/");
 }
@@ -56,19 +43,16 @@ void login(HTTPServerRequest req, HTTPServerResponse res)
   validateString(req.form["password"], 6, 20);
 
   // Verify user/password here.
-  auto users = db["users"];
-  Bson user = users.findOne(["username": req.form["username"]]);
-  logInfo("Found User");
-  if (!user.isNull()) {
+  db.User user;
+  if (db.findDBUser(req.form["username"], user)) {
     logInfo("Found User");
-    string passwordSalt = user["password_salt"].get!string();
-    string passwordHash = user["password_hash"].get!string();
+    logInfo(to!string(user));
     bool isPasswordMatch =
-      testSimplePasswordHash(passwordHash, req.form["password"], passwordSalt);
+      testSimplePasswordHash(user.passwordHash, req.form["password"], user.passwordSalt);
     if (isPasswordMatch) {
       logInfo("Success!");
       auto session = res.startSession();
-      session["username"] = req.form["username"];
+      session["username"] = user.username;
       logInfo("Logging in w/ " ~ session["username"]);
       res.redirect("/");
     }
@@ -98,11 +82,6 @@ void errorPage(HTTPServerRequest req,
 
 shared static this()
 {
-  // Initialize a connection to the MongoDB server.
-  logInfo("Connecting to MongoDB.");
-  client = connectMongoDB("127.0.0.1");
-  db = client.getDatabase("webbed");
-
   auto router = new URLRouter;
   router
     // Publicly visible pages.
