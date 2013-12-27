@@ -80,6 +80,14 @@ void errorPage(HTTPServerRequest req,
   res.render!("error.dt", req, error);
 }
 
+void getBlogIndex(HTTPServerRequest req, HTTPServerResponse res)
+{
+  db.BlogPost[] blogPosts = db.getBlogPostHeaders();
+  res.render!("blog.dt", req, blogPosts);
+}
+
+
+
 shared static this()
 {
   auto router = new URLRouter;
@@ -94,7 +102,7 @@ shared static this()
     .get("/logout", &logout)
     // Force other requests through authentication.
     .any("*", &checkLogin)
-    .get("/blog", staticTemplate!"blog.dt");
+    .get("/blog", &getBlogIndex);
 
   auto settings = new HTTPServerSettings;
   settings.port = 8443;

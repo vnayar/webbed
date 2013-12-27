@@ -15,6 +15,8 @@ struct User
   string passwordHash;
   string passwordSalt;
   string email;
+
+  BsonObjectID _id;
 }
 
 void addDBUser(in User user)
@@ -36,11 +38,45 @@ bool findDBUser(in string username, out User user)
     user = User(userBson["username"].get!string(),
                 userBson["password_hash"].get!string(),
                 userBson["password_salt"].get!string(),
-                userBson["email"].get!string()
+                userBson["email"].get!string(),
+                userBson["_id"].get!BsonObjectID()
                 );
     return true;
   }
   return false;
+}
+
+struct BlogPost
+{
+  string title;
+  string[] tags;
+  string text;
+  BsonObjectID user;
+
+  BsonObjectID _id;
+}
+
+BlogPost[] getBlogPostHeaders()
+{
+  auto blogpostsCollection = db["blogposts"];
+  // Get the posts but leave out the text.
+  MongoCursor blogPostsCursor = blogpostsCollection.find(Bson.EmptyObject, ["text": 0]);
+
+  // Start assembling our data.
+  BlogPost[] blogPosts;
+  for (auto i=0; i < 10 && !blogPostsCursor.empty(); i++) {
+    Bson bson = blogPostsCursor.front();
+    BlogPost blogPost = BlogPost();
+    blogPost.title = bson["title"].get!string();
+    foreach (tagBson; bson["tags"].get!(Bson[])()) {
+      blogPost.tags ~= tagBson.get!string();
+    }
+    blogPost._id = bson["_id"].get!BsonObjectID();
+    blogPosts ~= blogPost;
+    blogPostsCursor.popFront();
+  }
+
+  return blogPosts;
 }
 
 shared static this()

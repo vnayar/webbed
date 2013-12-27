@@ -15,4 +15,5 @@ html
       block body
     script(src='/js/jquery-2.0.3.min.js')
     script(src='/js/bootstrap.js')
+    block scripts
 

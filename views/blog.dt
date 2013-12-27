@@ -4,8 +4,22 @@ block title
   title Webbed - Blog
 
 block page-header
-  h1 Example page - Blog
+  h1 Blog
 
 block body
   p Hello, World!
-
+  button.btn.btn-default New Blog Entry
+  table.table.table-striped.blogposts
+    tr
+      th Created
+      th Title
+      th Tags
+    - foreach (blogPost; blogPosts)
+      tr.blogpost
+        td.created
+          span #{blogPost._id.timeStamp.toSimpleString()}
+        td.title
+          a(href='#{req.requestURL}/#{blogPost._id.toString()}') #{blogPost.title}
+        td.tags
+          - foreach (tag; blogPost.tags)
+            span.badge #{tag}
