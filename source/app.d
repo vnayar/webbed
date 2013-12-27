@@ -80,12 +80,33 @@ void errorPage(HTTPServerRequest req,
   res.render!("error.dt", req, error);
 }
 
-void getBlogIndex(HTTPServerRequest req, HTTPServerResponse res)
+void getBlogPosts(HTTPServerRequest req, HTTPServerResponse res)
 {
   db.BlogPost[] blogPosts = db.getBlogPostHeaders();
   res.render!("blog.dt", req, blogPosts);
 }
 
+void addBlogPost(HTTPServerRequest req, HTTPServerResponse res)
+{
+  // Create a new blog entry, redirect to the blog edit page.
+  auto id = db.addBlogPost(db.BlogPost("", [], "", req.session["username"]));
+  res.redirect("/blog/" ~ id.toString());
+}
+
+void viewBlogPost(HTTPServerRequest req, HTTPServerResponse res)
+{
+  logInfo("Viewing BlogPost " ~ req.params["_id"]);
+  auto blogPost = db.getBlogPost(req.params["_id"]);
+  res.render!("blogpost.dt", req, blogPost);
+}
+
+void editBlogPost(HTTPServerRequest req, HTTPServerResponse res)
+{
+}
+
+void postBlogPost(HTTPServerRequest req, HTTPServerResponse res)
+{
+}
 
 
 shared static this()
@@ -102,7 +123,11 @@ shared static this()
     .get("/logout", &logout)
     // Force other requests through authentication.
     .any("*", &checkLogin)
-    .get("/blog", &getBlogIndex);
+    .get("/blog", &getBlogPosts)
+    .post("/blog", &addBlogPost)
+    .get("/blog/:_id", &viewBlogPost)
+    .get("/blog/:_id/edit", &editBlogPost)
+    .post("/blog/:_id/edit", &postBlogPost);
 
   auto settings = new HTTPServerSettings;
   settings.port = 8443;

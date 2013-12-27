@@ -19,15 +19,13 @@ struct User
   BsonObjectID _id;
 }
 
-void addDBUser(in User user)
+BsonObjectID addDBUser(User user)
 {
+  user._id = BsonObjectID.generate();
   // Insert the data into the "users" collection of the database.
   auto users = db["users"];
-  users.insert(["username" : user.username,
-                "password_hash" : user.passwordHash,
-                "password_salt" : user.passwordSalt,
-                "email" : user.email
-                ]);
+  users.insert(serializeToBson!User(user));
+  return user._id;
 }
 
 bool findDBUser(in string username, out User user)
@@ -35,12 +33,7 @@ bool findDBUser(in string username, out User user)
   auto users = db["users"];
   Bson userBson = users.findOne(["username": username]);
   if (!userBson.isNull()) {
-    user = User(userBson["username"].get!string(),
-                userBson["password_hash"].get!string(),
-                userBson["password_salt"].get!string(),
-                userBson["email"].get!string(),
-                userBson["_id"].get!BsonObjectID()
-                );
+    user = deserializeBson!User(userBson);
     return true;
   }
   return false;
@@ -50,10 +43,33 @@ struct BlogPost
 {
   string title;
   string[] tags;
-  string text;
-  BsonObjectID user;
+  @optional string text;
+  string username;
+  @optional BsonObjectID user;
 
   BsonObjectID _id;
+}
+
+BsonObjectID addBlogPost(BlogPost blogPost)
+{
+  blogPost._id = BsonObjectID.generate();
+  auto blogPostsCollection = db["blogposts"];
+  // Insert a new blog post.
+  blogPostsCollection.insert(serializeToBson(blogPost));
+  return blogPost._id;
+}
+
+BlogPost getBlogPost(string id)
+{
+  auto blogPostsCollection = db["blogposts"];
+  logInfo("About to get blogpost");
+  Bson blogPostBson = blogPostsCollection.findOne(["_id" : BsonObjectID.fromString(id)]);
+  if (blogPostBson.isNull())
+    throw new Exception("Could not find blogpost with _id = " ~ id);
+  logInfo("About to deserialize " ~ blogPostBson.toJson().toString());
+  BlogPost blogPost = deserializeBson!BlogPost(blogPostBson);
+  logInfo("Got blogpost");
+  return blogPost;
 }
 
 BlogPost[] getBlogPostHeaders()
@@ -66,12 +82,7 @@ BlogPost[] getBlogPostHeaders()
   BlogPost[] blogPosts;
   for (auto i=0; i < 10 && !blogPostsCursor.empty(); i++) {
     Bson bson = blogPostsCursor.front();
-    BlogPost blogPost = BlogPost();
-    blogPost.title = bson["title"].get!string();
-    foreach (tagBson; bson["tags"].get!(Bson[])()) {
-      blogPost.tags ~= tagBson.get!string();
-    }
-    blogPost._id = bson["_id"].get!BsonObjectID();
+    BlogPost blogPost = deserializeBson!BlogPost(bson);
     blogPosts ~= blogPost;
     blogPostsCursor.popFront();
   }

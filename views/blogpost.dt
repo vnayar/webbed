@@ -1,0 +1,17 @@
+extends layout
+
+block title
+  title #{blogPost._id.timeStamp.toSimpleString()} - #{blogPost.title}
+
+block page-header
+  title #{blogPost._id.timeStamp.toSimpleString()} - #{blogPost.title}
+
+block body
+  h1 #{blogPost.title}
+  h2 Created #{blogPost._id.timeStamp.toSimpleString()}
+  h2 Username #{blogPost.username}
+  .tags
+    - foreach (tag; blogPost.tags)
+      span.badge #{tag}
+  hr
+  p #{blogPost.text}

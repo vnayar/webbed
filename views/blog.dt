@@ -7,8 +7,8 @@ block page-header
   h1 Blog
 
 block body
-  p Hello, World!
-  button.btn.btn-default New Blog Entry
+  form(action='#{req.requestURL}', method='POST')
+    button.btn.btn-default New Blog Entry
   table.table.table-striped.blogposts
     tr
       th Created
