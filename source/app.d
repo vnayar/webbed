@@ -1,6 +1,7 @@
 import vibe.d;
 import vibe.utils.validation;
 import core.time : dur;
+import std.array;
 
 static import util;
 static import db;
@@ -90,22 +91,33 @@ void addBlogPost(HTTPServerRequest req, HTTPServerResponse res)
 {
   // Create a new blog entry, redirect to the blog edit page.
   auto id = db.addBlogPost(db.BlogPost("", [], "", req.session["username"]));
-  res.redirect("/blog/" ~ id.toString());
+  res.redirect("/blog/" ~ id.toString() ~ "/edit");
 }
 
 void viewBlogPost(HTTPServerRequest req, HTTPServerResponse res)
 {
   logInfo("Viewing BlogPost " ~ req.params["_id"]);
   auto blogPost = db.getBlogPost(req.params["_id"]);
-  res.render!("blogpost.dt", req, blogPost);
+  res.render!("blogpost_view.dt", req, blogPost);
 }
 
 void editBlogPost(HTTPServerRequest req, HTTPServerResponse res)
 {
+  logInfo("Editing BlogPost " ~ req.params["_id"]);
+  auto blogPost = db.getBlogPost(req.params["_id"]);
+  res.render!("blogpost_edit.dt", req, blogPost);
 }
 
 void postBlogPost(HTTPServerRequest req, HTTPServerResponse res)
 {
+  logInfo("Posting BlogPost " ~ req.params["_id"]);
+  auto blogPost = db.getBlogPost(req.params["_id"]);
+  blogPost.title = req.form["title"];
+  blogPost.tags = split(req.form["tags"]);
+  blogPost.text = req.form["text"];
+  db.saveBlogPost(blogPost);
+
+  res.redirect("/blog");
 }
 
 

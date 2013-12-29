@@ -14,6 +14,7 @@ block body
       th Created
       th Title
       th Tags
+      th
     - foreach (blogPost; blogPosts)
       tr.blogpost
         td.created
@@ -23,3 +24,6 @@ block body
         td.tags
           - foreach (tag; blogPost.tags)
             span.badge #{tag}
+        td.edit
+          a(href='#{req.requestURL}/#{blogPost._id.toString()}/edit')
+            span.glyphicon.glyphicon-edit

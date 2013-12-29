@@ -1,0 +1,23 @@
+extends layout
+
+block title
+  title Edit Blog Post
+
+block page-header
+  title Edit Blog Post
+
+block body
+  - import std.array;
+  h3 Created: #{blogPost._id.timeStamp.toSimpleString()}
+  h3 Username: #{blogPost.username}
+  form(role='form', method='POST')
+    .form-group
+      label Title
+      input(type='text', name='title', value='#{blogPost.title}')
+    .form-group
+      label Tags
+      input(type='text', name='tags', value='#{join(blogPost.tags, " ")}')
+    .form-group
+      label Text
+      textarea(rows='20', cols='100', name='text') #{blogPost.text}
+    button.btn.btn-default Submit

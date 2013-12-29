@@ -59,6 +59,13 @@ BsonObjectID addBlogPost(BlogPost blogPost)
   return blogPost._id;
 }
 
+void saveBlogPost(BlogPost blogPost)
+{
+  auto blogPostsCollection = db["blogposts"];
+  logInfo("About to save blogpost with " ~ blogPost._id.toString());
+  blogPostsCollection.update(["_id" : blogPost._id], serializeToBson(blogPost));
+}
+
 BlogPost getBlogPost(string id)
 {
   auto blogPostsCollection = db["blogposts"];
