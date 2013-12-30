@@ -237,14 +237,14 @@ This line has <strike>strikethrough text</strike>.
 [http://somelink.com]
 [http://somelink.com Some Link]
 EOS";
-  writeln("---- Input Text ----");
-  writeln(text);
-  writeln("---- Scanning ----");
+  debug writeln("---- Input Text ----");
+  debug writeln(text);
+  debug writeln("---- Scanning ----");
   Scanner scanner = new Scanner(text);
   Token token;
   do {
     token = scanner.getToken();
-    writeln(token);
+    debug writeln(token);
   } while (token.type != Token.Type.SCAN_EOF);
 }
 
