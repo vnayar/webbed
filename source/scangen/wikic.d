@@ -33,14 +33,17 @@ This line has <strike>strikethrough text</strike>.
 --- Not quite a horizontal rule.
 ---- Just the right length.
 ----- A touch over.
-[http://somelink.com]
-[http://somelink.com Some Link]
+Some link here [http://somelink.com] with more text.
+Other link here [http://somelink.com Some Link] with bacon.
 EOS";
 
   scanner.load(text);
   Token token;
   while ((token = scanner.getToken()) != EOF_TOKEN) {
     writeln(tokenInfos[token.id].name, " => ", token.text);
+    foreach (i, group; token.groups) {
+      writeln("  Group ", i, ": ", group);
+    }
   }
   writeln(token);
 }

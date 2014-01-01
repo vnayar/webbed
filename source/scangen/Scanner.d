@@ -79,9 +79,15 @@ class Scanner
     size_t i = 0;
     for (; i < tokenInfos.length; i++) {
       auto captures = matchFirst(line[linePos .. $], tokenInfos[i].regex);
-      if (!captures.empty) {
+      if (!captures.empty &&
+          (tokenInfos[i].lineStart == false || linePos == 0)) {
         token.id = i;
-        token.text = captures[0];
+        token.text = captures.front;
+        captures.popFront();
+        while (!captures.empty) {
+          token.groups ~= captures.front;
+          captures.popFront();
+        }
         skip(token.text.length);
         break;
       }

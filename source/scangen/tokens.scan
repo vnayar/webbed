@@ -13,15 +13,17 @@
 # at the bottom of the list!
 
 EMPTY_LINE         /^$/
-LEVEL_START        /^==+/
-LEVEL_END          /==+$/
-ITALIC             /''/
-BOLD               /'''/
+LEVEL4             /^====(.*)====$/
+LEVEL3             /^===(.*)===$/
+LEVEL2             /^==(.*)==$/
 BOLD_ITALIC        /'''''/
+BOLD               /'''/
+ITALIC             /''/
 HORIZONTAL_RULE    /^----+/
-TAG_OPEN           /<\w+>/
-TAG_CLOSE          /</\w+>/
+TAG_OPEN           /<(\w+)>/
+TAG_CLOSE          /</(\w+)>/
 BULLET_LIST        /^\*+/
 NUMBER_LIST        /^#+/
-TEXT               /.*/
+LINK               /\[(\S+)\s*([^\]]*)\]/
+TEXT               /[^'<\[]+/
 
