@@ -1,0 +1,27 @@
+# Comments start with '#'.
+# White-space lines are ignored.
+# Columns are:
+#   [ID] [TOKEN_NAME] /[REGEX]/
+#   ID is the numerical value to use for the token.
+#   TOKEN_NAME is the symbollic name used to refer to the token in rules.
+#   REGEX is a regular expression indicating what characters the token matches.
+# Text is matched in single line mode, so ^ is start of file, and newlines
+# are in the input.
+#   * Use (^|[\n\r]+) for start of line or input.
+#   * use ($|[\n\r]+) for end of line or file.
+# Rules are evaluated from top to bottom, so put your generic catch-all tokens
+# at the bottom of the list!
+
+EMPTY_LINE         /^$/
+LEVEL_START        /^==+/
+LEVEL_END          /==+$/
+ITALIC             /''/
+BOLD               /'''/
+BOLD_ITALIC        /'''''/
+HORIZONTAL_RULE    /^----+/
+TAG_OPEN           /<\w+>/
+TAG_CLOSE          /</\w+>/
+BULLET_LIST        /^\*+/
+NUMBER_LIST        /^#+/
+TEXT               /.*/
+
