@@ -1,3 +1,5 @@
+import std.algorithm : map;
+import std.array : join;
 import std.stdio;
 import std.getopt;
 
@@ -12,20 +14,33 @@ import Scanner;
  */
 void main(string[] args)
 {
-  string configFile = "tokens.scan";
+  string configFileName = "wiki.grammar";
 
   getopt(args,
-         "config|c", &configFile);  // string
+         "config|c", &configFileName);  // string
 
   Grammar grammar = new Grammar();
 
 
-  writeln("Loading grammar from file: ", configFile);
-  grammar.loadFromFile(configFile);
+  auto file = File(configFileName, "r");
+  writeln("Loading grammar from file: ", configFileName);
+  grammar.load(file.byLine());
 
   writeln("Found the following symbols:  ");
-  foreach (name, symbolId; grammar.nameSymbolIdMap) {
-    writeln(name, " --> ", grammar.symbols[symbolId]);
+  foreach (symbolId, symbol; grammar.symbols) {
+    writeln("(", symbolId, ") ", symbol.name, ":");
+    writeln("  name ", symbol.name, " ==> ", grammar.nameSymbolIdMap[symbol.name]);
+    if (symbol.type == Symbol.Type.PRODUCTION)
+      writeln("  Productions:  ", grammar.symbolIdProductionsMap[symbolId]);
+    else if (symbol.type == Symbol.Type.TOKEN)
+      writeln("  Token: ", grammar.symbolIdTokenInfoMap[symbolId]);
+  }
+
+  writeln("Found the following productions:  ");
+  foreach (production; grammar.productions) {
+    write(production.symbolId, " ");
+    write(grammar.symbols[production.symbolId].name, " => ");
+    writeln(join(map!(s => grammar.symbols[s].name)(production.symbolIds), " "));
   }
 
   TokenInfo[] tokenInfos = grammar.tokenInfos;

@@ -1,6 +1,6 @@
 import std.regex;
 
-class TokenInfo
+struct TokenInfo
 {
   string name;
   Regex!char regex;
