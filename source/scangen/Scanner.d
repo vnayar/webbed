@@ -3,8 +3,10 @@ import std.regex;
 import std.string;
 import std.stdio;
 
-import Token;
 import TokenInfo;
+
+public import Token;
+
 
 
 class ScannerException : Exception
@@ -71,8 +73,6 @@ class Scanner
       assert(empty() || lines[lineNum].length == 0 || !isWhite(lines[lineNum][linePos]));
     }
   body {
-    if (empty())
-      return EOF_TOKEN;
     Token token;
     string line = lines[lineNum];
     // Iterate through tokens to see which one matches.

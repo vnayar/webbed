@@ -3,7 +3,7 @@ import std.getopt;
 
 import Token;
 import TokenInfo;
-import TokenInfoReader;
+import Grammar;
 import Scanner;
 
 /**
@@ -17,8 +17,18 @@ void main(string[] args)
   getopt(args,
          "config|c", &configFile);  // string
 
-  TokenInfoReader reader = new TokenInfoReader();
-  TokenInfo[] tokenInfos = reader.readFile(configFile);
+  Grammar grammar = new Grammar();
+
+
+  writeln("Loading grammar from file: ", configFile);
+  grammar.loadFromFile(configFile);
+
+  writeln("Found the following symbols:  ");
+  foreach (name, symbolId; grammar.nameSymbolIdMap) {
+    writeln(name, " --> ", grammar.symbols[symbolId]);
+  }
+
+  TokenInfo[] tokenInfos = grammar.tokenInfos;
   Scanner scanner = new Scanner(tokenInfos);
 
   string text = q"EOS
@@ -37,9 +47,15 @@ Some link here [http://somelink.com] with more text.
 Other link here [http://somelink.com Some Link] with bacon.
 EOS";
 
+
+  writeln("== Scanner input ==");
+  writeln(text);
+
+  writeln("== Scanner output ==");
   scanner.load(text);
   Token token;
-  while ((token = scanner.getToken()) != EOF_TOKEN) {
+  while (!scanner.empty()) {
+    token = scanner.getToken();
     writeln(tokenInfos[token.id].name, " => ", token.text);
     foreach (i, group; token.groups) {
       writeln("  Group ", i, ": ", group);

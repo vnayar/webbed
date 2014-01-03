@@ -13,9 +13,8 @@
 # at the bottom of the list!
 
 EMPTY_LINE         /^$/
-LEVEL4             /^====(.*)====$/
-LEVEL3             /^===(.*)===$/
-LEVEL2             /^==(.*)==$/
+LEVEL_OPEN         /^==+/
+LEVEL_CLOSE        /==+$/
 BOLD_ITALIC        /'''''/
 BOLD               /'''/
 ITALIC             /''/
@@ -25,5 +24,52 @@ TAG_CLOSE          /</(\w+)>/
 BULLET_LIST        /^\*+/
 NUMBER_LIST        /^#+/
 LINK               /\[(\S+)\s*([^\]]*)\]/
-TEXT               /[^'<\[]+/
+TEXT               /[^='<\[]+|=+/
+
+= Productions =
+
+# A grammar for wiki formats:
+# { } = optional
+# e.g.
+#   statement_list => statement {statement}
+# becomes
+#   statement_list => statement statement_tail
+#   statement_tail => LAMBDA
+#   statement_tail => statement statement_tail
+# 
+# Special tokens introduced into grammar:
+#   LAMBDA => An empty production, matches even for no input.
+#   TOKEN_EOF
+# 
+# Scanning should proceed line at a time.
+# Token contains string start/end position.
+# We use custom format to indicate flags between square brackets '[' and ']'.
+
+goal => wiki STOP
+wiki => statement_list
+
+#statement_list => statement {statement}
+statement_list => statement statement_list_tail
+statement_list_tail => LAMBDA
+statement_list_tail => statement statement_list_tail
+
+statement => line_statement
+statement => inline_statement_list
+
+line_statement => LEVEL_OPEN inline_statement_list LEVEL_CLOSE
+line_statement => EMPTY_LINE
+line_statement => BULLET_LIST inline_statement_list
+line_statement => NUMBER_LIST inline_statement_list
+
+#inline_statement_list => inline_statement {inline_statement}
+inline_statement_list => inline_statement inline_statement_list_tail
+inline_statement_list_tail => LAMBDA
+inline_statement_list_tail => inline_statement inline_statement_list_tail
+
+inline_statement => BOLD_ITALIC TEXT BOLD_ITALIC
+inline_statement => BOLD TEXT BOLD
+inline_statement => ITALIC TEXT ITALIC
+inline_statement => LINK
+inline_statement => TAG_OPEN inline_statement TAG_CLOSE
+inline_statement => TEXT
 

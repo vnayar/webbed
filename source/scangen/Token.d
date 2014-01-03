@@ -5,5 +5,3 @@ struct Token
   string[] groups;
 }
 
-Token EOF_TOKEN = Token(size_t.max);
-
