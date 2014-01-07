@@ -69,20 +69,28 @@ private:
 
 public:
   Symbol[] symbols;
+  size_t START_ID;
+  size_t STOP_ID;
+  size_t LAMBDA_ID;
   TokenInfo[] tokenInfos;
   Production[] productions;
 
   size_t[string] nameSymbolIdMap;  // Used while processing config file.
   // A symbol may map to 1 token.
-  TokenInfo*[size_t] symbolIdTokenInfoMap;
+  size_t[size_t] symbolIdTokenInfoIdMap;
   // A symbol may map to many productions.
-  Production*[][size_t] symbolIdProductionsMap;
+  size_t[][size_t] symbolIdProductionIdsMap;
 
   this() {
+    symbols ~= Symbol(Symbol.Type.START, "START");
+    nameSymbolIdMap["START"] = symbols.length - 1;
+    START_ID = symbols.length - 1;
     symbols ~= Symbol(Symbol.Type.STOP, "STOP");
     nameSymbolIdMap["STOP"] = symbols.length - 1;
+    STOP_ID = symbols.length - 1;
     symbols ~= Symbol(Symbol.Type.LAMBDA, "LAMBDA");
     nameSymbolIdMap["LAMBDA"] = symbols.length - 1;
+    LAMBDA_ID = symbols.length - 1;
   }
 
   static bool readTokenInfo(in char[] line, TokenInfo* tokenInfo)
@@ -131,6 +139,7 @@ public:
     string productionName = to!string(captures[1]);
     size_t symbolId = nameSymbolIdMap[productionName];
     productions ~= Production(symbolId);
+    symbolIdProductionIdsMap[symbolId] ~= productions.length - 1;
     Production* production = &productions[productions.length - 1];
 
     string productionText = captures[2];
@@ -139,7 +148,6 @@ public:
       production.symbolIds ~= nameSymbolIdMap[name];
     }
 
-    symbolIdProductionsMap[symbolId] ~= production;
 
     return true;
   }
@@ -173,8 +181,7 @@ public:
       // Create a symbolic that references this token.
       writeln("tokenInfo.name = ", tokenInfo.name);
       symbols ~= Symbol(Symbol.Type.TOKEN, tokenInfo.name);
-      symbolIdTokenInfoMap[symbols.length - 1] =
-        &tokenInfos[tokenInfos.length - 1];
+      symbolIdTokenInfoIdMap[symbols.length - 1] = tokenInfos.length - 1;
       // And make sure we can map the name to it's symbol-id.
       nameSymbolIdMap[tokenInfo.name] = symbols.length - 1;
     }
@@ -231,7 +238,7 @@ public:
     g.load(text);
     assert(g.tokenInfos.length == 2);
     assert(g.productions.length == 0);
-    assert(g.symbols.length == 4);  // Don't forget "STOP" and "LAMBDA".
+    assert(g.symbols.length == 5);  // Don't forget "START", "STOP", and "LAMBDA".
     debug writeln("Test2 [OK]");
   }
 
@@ -255,11 +262,11 @@ public:
     g.load(text);
     assert(g.tokenInfos.length == 2);
     assert(g.productions.length == 3);
-    assert(g.symbols.length == 6);  // Don't forget "STOP" and "LAMBDA".
-    assert(g.nameSymbolIdMap.length == 6);
-    assert(g.symbolIdTokenInfoMap.length == 2);
-    assert(g.symbolIdProductionsMap.length == 2);
-    assert(g.symbolIdProductionsMap[g.nameSymbolIdMap["cat"]].length == 2);
+    assert(g.symbols.length == 7);  // Don't forget "START", "STOP", and "LAMBDA".
+    assert(g.nameSymbolIdMap.length == 7);
+    assert(g.symbolIdTokenInfoIdMap.length == 2);
+    assert(g.symbolIdProductionIdsMap.length == 2);
+    assert(g.symbolIdProductionIdsMap[g.nameSymbolIdMap["cat"]].length == 2);
     debug writeln("Test3 [OK]");
   }
 }

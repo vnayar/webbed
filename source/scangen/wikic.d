@@ -31,9 +31,9 @@ void main(string[] args)
     writeln("(", symbolId, ") ", symbol.name, ":");
     writeln("  name ", symbol.name, " ==> ", grammar.nameSymbolIdMap[symbol.name]);
     if (symbol.type == Symbol.Type.PRODUCTION)
-      writeln("  Productions:  ", grammar.symbolIdProductionsMap[symbolId]);
+      writeln("  Productions:  ", grammar.symbolIdProductionIdsMap[symbolId]);
     else if (symbol.type == Symbol.Type.TOKEN)
-      writeln("  Token: ", grammar.symbolIdTokenInfoMap[symbolId]);
+      writeln("  Token: ", grammar.symbolIdTokenInfoIdMap[symbolId]);
   }
 
   writeln("Found the following productions:  ");

@@ -45,7 +45,7 @@ TEXT               /[^='<\[]+|=+/
 # Token contains string start/end position.
 # We use custom format to indicate flags between square brackets '[' and ']'.
 
-goal => wiki STOP
+START => wiki STOP
 wiki => statement_list
 
 #statement_list => statement {statement}
