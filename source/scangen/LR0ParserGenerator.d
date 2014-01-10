@@ -4,6 +4,29 @@ import std.algorithm;
 import container;
 import Grammar;
 
+version(unittest)
+{
+  // Introduce some test data to be used for unittests.
+  Grammar g1;
+  static this() {
+    g1 = new Grammar();
+    string[] grammarConfig =
+      [
+       r"# Tokens",
+       r"PLUS /\+/",
+       r"ID   /\w+/",
+       r"LPAREN /\(/",
+       r"RPAREN /\)/",
+       r"= Productions =",
+       r"S => E STOP",
+       r"E => E PLUS T",
+       r"E => T",
+       r"T => ID",
+       r"T => LPAREN E RPAREN"
+       ];
+    g1.load(grammarConfig);
+  }
+}
 
 class ParserGeneratorException : Exception
 {
@@ -83,6 +106,7 @@ public:
   {
     ConfigurationSet nextSet = set;
     bool isNewConf;
+    debug writeln("Calling closure0 with set: ", set.toArray());
     do {
       isNewConf = false;
       // Check all configurations in our configuration set.
@@ -114,24 +138,7 @@ public:
 
   unittest
   {
-    Grammar g = new Grammar();
-    string[] grammarConfig =
-      [
-       r"# Tokens",
-       r"PLUS /\+/",
-       r"ID   /\w+/",
-       r"LPAREN /\(/",
-       r"RPAREN /\)/",
-       r"= Productions =",
-       r"S => E STOP",
-       r"E => E PLUS T",
-       r"E => T",
-       r"T => ID",
-       r"T => LPAREN E RPAREN"
-       ];
-    g.load(grammarConfig);
-
-    auto pg = new LR0ParserGenerator(g);
+    auto pg = new LR0ParserGenerator(g1);
 
     // Create ourselves a nice configuration set to play with.
     auto set = new ConfigurationSet();
@@ -173,24 +180,7 @@ public:
 
   unittest
   {
-    Grammar g = new Grammar();
-    string[] grammarConfig =
-      [
-       r"# Tokens",
-       r"PLUS /\+/",
-       r"ID   /\w+/",
-       r"LPAREN /\(/",
-       r"RPAREN /\)/",
-       r"= Productions =",
-       r"S => E STOP",
-       r"E => E PLUS T",
-       r"E => T",
-       r"T => ID",
-       r"T => LPAREN E RPAREN"
-       ];
-    g.load(grammarConfig);
-
-    auto pg = new LR0ParserGenerator(g);
+    auto pg = new LR0ParserGenerator(g1);
 
     // Create ourselves a nice configuration set to play with.
     auto set = new ConfigurationSet();
@@ -198,7 +188,7 @@ public:
     set.add(Configuration(0, 1));  // S => E .STOP
     set.add(Configuration(1, 1));  // E => E .PLUS T
     debug writeln("set.size() = ", set.size());
-    set = pg.successor0(set, g.nameSymbolIdMap["PLUS"]);
+    set = pg.successor0(set, g1.nameSymbolIdMap["PLUS"]);
     debug writeln("set.size() = ", set.size());
     assert(set.size() == 3);
     assert(set.contains(Configuration(1, 2))); // E => E PLUS .T
@@ -278,7 +268,9 @@ public:
 
     // Create a start state in the CFSM that matches the first production.
     ConfigurationSet start = new ConfigurationSet();
-    start.add(Configuration(grammar.productions[0].symbolId, 0));
+    debug writeln("TEST A:  grammar.productions = ", grammar.productions);
+    //start.add(Configuration(grammar.productions[0].symbolId, 0));
+    start.add(Configuration(0, 0));
     closure0(start);
     int startStateId = cfsm.addState(start);
 
@@ -326,59 +318,45 @@ public:
 
   unittest
   {
-    Grammar g = new Grammar();
-    string[] grammarConfig =
-      [
-       r"# Tokens",
-       r"ID   /\w+/",
-       r"= Productions =",
-       r"START => S STOP",
-       r"S => ID",
-       r"S => LAMBDA"
-       ];
-    g.load(grammarConfig);
-
-    auto pg = new LR0ParserGenerator(g);
+    auto pg = new LR0ParserGenerator(g1);
     auto cfsm = pg.buildCFSM();
 
     debug writeln("cfsm.states.length = ", cfsm.states.length);
     cfsm.printStates();
-    assert(cfsm.states.length == 5);
+    assert(cfsm.states.length == 11);
 
     debug writeln("buildCFSM [OK]");
 
     // Now test the buildGotoTable function.
     auto gotoTable = pg.buildGotoTable(cfsm);
-    assert(gotoTable.length == 5);
-    size_t ID_id = g.nameSymbolIdMap["ID"];
-    size_t STOP_id = g.nameSymbolIdMap["START"];
-    size_t S_id = g.nameSymbolIdMap["S"];
+    assert(gotoTable.length == 11);
+    size_t ID_id = g1.nameSymbolIdMap["ID"];
+    size_t STOP_id = g1.nameSymbolIdMap["START"];
+    size_t E_id = g1.nameSymbolIdMap["E"];
+
     // State 0 is the error state.
     assert(gotoTable[0][ID_id] == 0);
     assert(gotoTable[0][STOP_id] == 0);
-    assert(gotoTable[0][S_id] == 0);
+    assert(gotoTable[0][E_id] == 0);
 
     // State 1 is the start state.
-    //    START => . S STOP
-    //    S => . ID
-    //    S => LAMBDA .
+    //  #0  S => . E STOP
+    //  #1  E => . E PLUS T
+    //  #2  E => . T
+    //  #3  T => . ID
+    //  #4  T => . LPAREN E RPAREN
+    size_t stateId = 1;
 
     // Make sure the transition on ID has:
-    //   S => ID .
-    assert(cfsm.states[gotoTable[1][ID_id]].contains(Configuration(1, 1)));
-    assert(gotoTable[1][STOP_id] == 0);  // The error state
-    // Make sure the transition on S has:
-    //   START => S . STOP
-    assert(cfsm.states[gotoTable[1][S_id]].contains(Configuration(0, 1)));
+    //   T => ID .
+    assert(cfsm.states[gotoTable[stateId][ID_id]].contains(Configuration(3, 1)));
+    // The startId has no transition on STOP.
+    assert(gotoTable[stateId][STOP_id] == 0);  // The error state
+    // Make sure the transition on E has:
+    //   S => E . STOP
+    assert(cfsm.states[gotoTable[stateId][E_id]].contains(Configuration(0, 1)));
 
     debug writeln("buildGotoTable [OK]");
-
-    // Grammar has a shift-reduce conflict in the initial state due to LAMBDA
-    // production (which can be reduced) and presense of shiftable token.
-    //auto actionTable = parser.buildActionTable(cfsm);
-    //debug writeln("Action Table");
-    //debug writeln("============");
-    //debug writeln(actionTable);
   }
 
   /**
@@ -436,6 +414,54 @@ public:
         actionTable[stateId] = Action(Action.Type.ERROR);
     }
     return actionTable;
+  }
+
+  unittest
+  {
+    debug writeln("Building CFSM for actionTable test.");
+    auto pg = new LR0ParserGenerator(g1);
+    auto cfsm = pg.buildCFSM();
+    cfsm.printStates();
+
+    // Grammar has a shift-reduce conflict in the initial state due to LAMBDA
+    // production (which can be reduced) and presense of shiftable token.
+    auto actionTable = pg.buildActionTable(cfsm);
+    debug writeln("Action Table");
+    debug writeln("============");
+    debug writeln(actionTable);
+
+    // Find 4 different states based upon the ConfigurationSet.
+    auto cs1 = new ConfigurationSet();
+    cs1.add(Configuration(1, 2));  // E => E PLUS . T
+    cs1.add(Configuration(3, 0));  // T => . ID
+    cs1.add(Configuration(4, 0));  // T => . LPAREN E RPAREN
+    auto cs1i = cfsm.findStateIndex(cs1);
+    assert(cs1i != -1);
+    writeln("Checking state ", cs1i);
+    assert(actionTable[cs1i] == Action(Action.Type.SHIFT));
+
+    auto cs2 = new ConfigurationSet();
+    cs2.add(Configuration(1, 3));  // E => E PLUS T .
+    auto cs2i = cfsm.findStateIndex(cs2);
+    assert(cs2i != -1);
+    writeln("Checking state ", cs2i);
+    assert(actionTable[cs2i] == Action(Action.Type.REDUCE, 1));
+
+    auto cs3 = new ConfigurationSet();  // Empty set is the error state.
+    auto cs3i = cfsm.findStateIndex(cs3);
+    assert(cs3i != -1);
+    writeln("Checking state ", cs3i);
+    assert(actionTable[cs3i] == Action(Action.Type.ERROR));
+
+
+    auto cs4 = new ConfigurationSet();
+    cs4.add(Configuration(0, 2));  // S => E STOP .
+    auto cs4i = cfsm.findStateIndex(cs4);
+    assert(cs4i != -1);
+    writeln("Checking state ", cs4i);
+    assert(actionTable[cs4i] == Action(Action.Type.ACCEPT, 0));
+
+    debug writeln("buildActionTable [OK]");
   }
 
 }
