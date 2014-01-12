@@ -2,6 +2,7 @@ import std.regex;
 
 struct TokenInfo
 {
+  size_t symbolId;
   string name;
   Regex!char regex;
   bool lineStart;

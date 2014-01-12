@@ -53,6 +53,13 @@ class Set(T)
     set[elem] = true;
   }
 
+  void add(in Set!T unionSet)
+  {
+    foreach (key; unionSet.toArray()) {
+      set[key] = true;
+    }
+  }
+
   void remove(in T elem)
   {
     set.remove(elem);

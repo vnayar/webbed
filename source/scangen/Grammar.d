@@ -4,9 +4,29 @@ import std.stdio;
 import std.conv : to;
 import std.array : split;
 
+import container;
 public import TokenInfo;
 
 
+version(unittest)
+{
+  string[] grammarConfig =
+    [
+     r"# Tokens",
+     r"VAR /_\w+/",
+     r"FUNC /\w+/",
+     r"PLUS /\+/",
+     r"LPAREN /\(/",
+     r"RPAREN /\)/",
+     r"= Productions =",
+     r"E => PREFIX LPAREN E RPAREN",
+     r"E => VAR TAIL",
+     r"PREFIX => FUNC",
+     r"PREFIX => ",
+     r"TAIL => PLUS E",
+     r"TAIL => "
+     ];
+}
 /**
  * A grammar consists of symbols:
  *  - terminal symbols, like tokens
@@ -19,7 +39,6 @@ struct Symbol
   enum Type {
     TOKEN,
     PRODUCTION,
-    LAMBDA,
     START,
     STOP
   };
@@ -88,9 +107,10 @@ public:
     symbols ~= Symbol(Symbol.Type.STOP, "STOP");
     nameSymbolIdMap["STOP"] = symbols.length - 1;
     STOP_ID = symbols.length - 1;
-    symbols ~= Symbol(Symbol.Type.LAMBDA, "LAMBDA");
+    symbols ~= Symbol(Symbol.Type.STOP, "LAMBDA");
     nameSymbolIdMap["LAMBDA"] = symbols.length - 1;
     LAMBDA_ID = symbols.length - 1;
+
   }
 
   static bool readTokenInfo(in char[] line, TokenInfo* tokenInfo)
@@ -145,6 +165,9 @@ public:
     string productionText = captures[2];
     foreach (name; split(productionText)) {
       debug writeln("  name=", name);
+      if (name !in nameSymbolIdMap)
+        throw new GrammarException("Reference to unknown symbol " ~ name ~
+                                   " in line " ~ line);
       production.symbolIds ~= nameSymbolIdMap[name];
     }
 
@@ -177,13 +200,13 @@ public:
       if (!readTokenInfo(line, &tokenInfo))
         throw new GrammarException("TokenInfo format error:  " ~ to!string(line),
                                    lineNumber);
-      tokenInfos ~= tokenInfo;  // Add our new token.
-      // Create a symbolic that references this token.
-      writeln("tokenInfo.name = ", tokenInfo.name);
       symbols ~= Symbol(Symbol.Type.TOKEN, tokenInfo.name);
-      symbolIdTokenInfoIdMap[symbols.length - 1] = tokenInfos.length - 1;
+      tokenInfo.symbolId = symbols.length - 1;
       // And make sure we can map the name to it's symbol-id.
       nameSymbolIdMap[tokenInfo.name] = symbols.length - 1;
+
+      tokenInfos ~= tokenInfo;  // Add our new token.
+      symbolIdTokenInfoIdMap[symbols.length - 1] = tokenInfos.length - 1;
     }
 
     // For productions, we need to make two passes.
@@ -268,6 +291,174 @@ public:
     assert(g.symbolIdProductionIdsMap.length == 2);
     assert(g.symbolIdProductionIdsMap[g.nameSymbolIdMap["cat"]].length == 2);
     debug writeln("Test3 [OK]");
+  }
+
+public:
+  // Now some utility functions for determing useful properties of symbols.
+  bool[] symbolDerivesLambda;
+  Set!(size_t)[] symbolFirstSet;
+
+  // Fill in data indicating if a production can derive LAMBDA.
+  void initSymbolDerivesLambda()
+  {
+    // Initialize our data, initialized to false.
+    symbolDerivesLambda.length = symbols.length;
+
+    bool isChange;
+    do {
+      isChange = false;
+      foreach (production; productions) {
+        writeln("Working on production:  ", production);
+        if (!symbolDerivesLambda[production.symbolId]) {
+          // Check if the production is itself lambda (empty).
+          if (production.symbolIds.length == 0) {
+            isChange = true;
+            symbolDerivesLambda[production.symbolId] = true;
+            continue;
+          }
+          // Check if each part of the RHS derives lambda.
+          bool isProdLambda = true;
+          foreach (symbolId; production.symbolIds)
+            isProdLambda = isProdLambda && symbolDerivesLambda[symbolId];
+
+          if (isProdLambda) {
+            isChange = true;
+            symbolDerivesLambda[production.symbolId] = true;
+          }
+        }
+      }
+    } while (isChange);
+  }
+
+  unittest
+  {
+    Grammar g = new Grammar();
+    string[] text =
+      [
+       r"a  /a/",
+       r"= Productions =",
+       r"A => B C",
+       r"B => D E",
+       r"C => a",
+       r"D =>",
+       r"E =>",
+       r"E => a",
+       ];
+    g.load(text);
+    g.initSymbolDerivesLambda();
+    assert(g.symbolDerivesLambda[g.productions[0].symbolId] == false);
+    assert(g.symbolDerivesLambda[g.productions[1].symbolId] == true);
+    assert(g.symbolDerivesLambda[g.productions[2].symbolId] == false);
+    assert(g.symbolDerivesLambda[g.productions[3].symbolId] == true);
+    assert(g.symbolDerivesLambda[g.productions[4].symbolId] == true);
+
+    debug writeln("initSymbolDerivesLambda [OK]");
+  }
+
+  // Get the terminal symbol may be the first in a list of symbols.
+  Set!size_t computeFirstSet(in size_t[] symbolIds)
+  in {
+    assert(symbolFirstSet.length == symbols.length,
+           "Call initSymbolFirstSet before calling computeFirstSet!");
+  }
+  body {
+    auto result = new Set!size_t();
+    if (symbolIds.length == 0) {
+      result.add(LAMBDA_ID);  // An empty list may derive lambda.
+      return result;
+    }
+
+    bool canBeLambda = true;
+    result.add(symbolFirstSet[symbolIds[0]]);
+    for (auto i = 0; i < symbolIds.length && canBeLambda; i++) {
+      auto firstSet = symbolFirstSet[symbolIds[i]];
+      result.add(firstSet);
+
+      if (!firstSet.contains(LAMBDA_ID)) {
+        canBeLambda = false;
+        result.remove(LAMBDA_ID);
+      }
+    }
+
+    return result;
+  }
+
+  // Note: The set type used here depends on dynamic memory allocation.
+  // Performance may be performed for sets with known max sizes by using
+  // a bit-vector.  Consider std.container.Array!bool
+  void initSymbolFirstSet()
+  in {
+    assert(symbolDerivesLambda.length == symbols.length,
+           "Call initDerivesLambda before initSymbolFirstSet!");
+  }
+  body {
+    symbolFirstSet.length = symbols.length;
+
+    // Initialize the production first-sets to empty.
+    foreach (production; productions) {
+      symbolFirstSet[production.symbolId] = new Set!size_t();
+      // We use the LAMBDA_ID to indicate symbols that may derive
+      // lambda, but optionally may start with terminals as well.
+      if (symbolDerivesLambda[production.symbolId] == true)
+        symbolFirstSet[production.symbolId].add(LAMBDA_ID);
+    }
+
+    // The terminal symbols are straight forward, they are their own "first".
+    foreach (tokenInfo; tokenInfos) {
+      symbolFirstSet[tokenInfo.symbolId] = new Set!size_t();
+      symbolFirstSet[tokenInfo.symbolId].add(tokenInfo.symbolId);
+      // While we're here, add to productions that start with this symbol.
+      foreach (production; productions) {
+        if (production.symbolIds.length > 0 &&
+            production.symbolIds[0] == tokenInfo.symbolId)
+          symbolFirstSet[production.symbolId].add(tokenInfo.symbolId);
+      }
+    }
+
+    // New we propagate changes up depending on what symbols may derive lambda.
+    bool isChange;
+    do {
+      isChange = false;
+      foreach (production; productions) {
+        auto firstSet = symbolFirstSet[production.symbolId];
+        auto size = firstSet.size();
+        firstSet.add(computeFirstSet(production.symbolIds));
+        // Check to see if the set changed.
+        if (size != firstSet.size())
+          isChange = true;
+      }
+    } while (isChange);
+  }
+
+  unittest
+  {
+    auto g = new Grammar();
+    g.load(grammarConfig);
+    g.initSymbolDerivesLambda();
+    g.initSymbolFirstSet();
+
+    auto LPAREN_firstSet = g.symbolFirstSet[g.nameSymbolIdMap["LPAREN"]];
+    assert(LPAREN_firstSet.size() == 1);
+    assert(LPAREN_firstSet.contains(g.nameSymbolIdMap["LPAREN"]));
+
+    auto E_firstSet = g.symbolFirstSet[g.nameSymbolIdMap["E"]];
+    debug writeln("Testing E_firstSet ", E_firstSet.toArray());
+    assert(E_firstSet.size() == 3);
+    assert(E_firstSet.contains(g.nameSymbolIdMap["VAR"]));
+    assert(E_firstSet.contains(g.nameSymbolIdMap["FUNC"]));
+    assert(E_firstSet.contains(g.nameSymbolIdMap["LPAREN"]));
+
+    auto PREFIX_firstSet = g.symbolFirstSet[g.nameSymbolIdMap["PREFIX"]];
+    assert(PREFIX_firstSet.size() == 2);
+    assert(PREFIX_firstSet.contains(g.nameSymbolIdMap["FUNC"]));
+    assert(PREFIX_firstSet.contains(g.nameSymbolIdMap["LAMBDA"]));
+
+    auto TAIL_firstSet = g.symbolFirstSet[g.nameSymbolIdMap["TAIL"]];
+    assert(TAIL_firstSet.size() == 2);
+    assert(TAIL_firstSet.contains(g.nameSymbolIdMap["PLUS"]));
+    assert(TAIL_firstSet.contains(g.nameSymbolIdMap["LAMBDA"]));
+
+    debug writeln("initSymbolFirstSet [OK]");
   }
 }
 

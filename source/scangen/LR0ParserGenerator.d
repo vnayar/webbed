@@ -1,4 +1,4 @@
-debug import std.stdio;
+import std.stdio;
 import std.algorithm;
 
 import container;
@@ -285,8 +285,6 @@ public:
             symbol.type != Symbol.Type.PRODUCTION &&
             symbol.type != Symbol.Type.STOP)
           continue;
-        writeln("checking for successor to ", stateId, " under symbol ",
-                grammar.symbols[symbolId].name);
         auto successor = successor0(cfsm.states[stateId], symbolId);
         auto newStateId = cfsm.findStateIndex(successor);
         if (newStateId == -1) {

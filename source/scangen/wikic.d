@@ -7,6 +7,8 @@ import Token;
 import TokenInfo;
 import Grammar;
 import Scanner;
+import LR0ParserGenerator;
+
 
 /**
  * Program that reads an input file in wiki format, and converts
@@ -42,6 +44,12 @@ void main(string[] args)
     write(grammar.symbols[production.symbolId].name, " => ");
     writeln(join(map!(s => grammar.symbols[s].name)(production.symbolIds), " "));
   }
+
+  auto pg = new LR0ParserGenerator(grammar);
+  auto cfsm = pg.buildCFSM();
+  cfsm.printStates();
+  auto gotoTable = pg.buildGotoTable(cfsm);
+  auto actionTable = pg.buildActionTable(cfsm);
 
   TokenInfo[] tokenInfos = grammar.tokenInfos;
   Scanner scanner = new Scanner(tokenInfos);
