@@ -8,6 +8,7 @@ import container;
 public import TokenInfo;
 
 
+// Some test data shared by multiple unittests.
 version(unittest)
 {
   string[] grammarConfig =
@@ -22,11 +23,12 @@ version(unittest)
      r"E => PREFIX LPAREN E RPAREN",
      r"E => VAR TAIL",
      r"PREFIX => FUNC",
-     r"PREFIX => ",
+     r"PREFIX =>",
      r"TAIL => PLUS E",
-     r"TAIL => "
+     r"TAIL =>"
      ];
 }
+
 /**
  * A grammar consists of symbols:
  *  - terminal symbols, like tokens
@@ -47,13 +49,20 @@ struct Symbol
   size_t id;
 }
 
+/**
+ * Productions describe combinations of symbols that are in the language.
+ * A grammar production rule of the form:
+ *  PRODUCTION_SYMBOL => SYMBOL SYMBOL SYMBOL ...
+ */
 struct Production
 {
   size_t symbolId;
   size_t[] symbolIds;
 }
 
-
+/**
+ * Exceptions specific to the evaluation of a grammar description.
+ */
 class GrammarException : Exception
 {
   this(string message, int line = __LINE__, Throwable next = null)
@@ -62,9 +71,16 @@ class GrammarException : Exception
   }
 }
 
+
+/**
+ * A set of symbols (both terminal and non-terminal) that together describe
+ * the rules that indicate valid instances of a language.  All these rules,
+ * and their operations, collectively are the grammar.
+ */
 class Grammar
 {
 private:
+  // Regular expressions used to recognize configuration data.
   static Regex!char commentRegex = regex(r"^#.*$|^\s*$");
   static Regex!char tokenRegex = regex(r"^\s*(\w+)\s+/(.*)/\s*$");
   static Regex!char productionRegex = regex(r"^\s*(\w+)\s*=>\s*(.*)\s*$");
@@ -74,6 +90,15 @@ private:
   static bool isComment(in char[] line)
   {
     return !matchFirst(line, commentRegex).empty;
+  }
+
+  unittest
+  {
+    assert(!isComment("Hello There"));
+    assert(isComment("#Hello There"));
+    assert(isComment("   "));
+    assert(isComment(""));
+    debug writeln("isComment [OK]");
   }
 
   static bool isTokenInfo(in char[] line)
@@ -87,18 +112,18 @@ private:
   }
 
 public:
-  Symbol[] symbols;
+  // Core data for the grammar.
+  Symbol[] symbols;  // A complete listing of all symbols in the grammar.
   size_t START_ID;
   size_t STOP_ID;
   size_t LAMBDA_ID;
-  TokenInfo[] tokenInfos;
-  Production[] productions;
+  TokenInfo[] tokenInfos;  // Details about token symbols.
+  Production[] productions;  // Details about production symbols.
 
+  // Helper data for displaying and looking up symbols.
   size_t[string] nameSymbolIdMap;  // Used while processing config file.
-  // A symbol may map to 1 token.
-  size_t[size_t] symbolIdTokenInfoIdMap;
-  // A symbol may map to many productions.
-  size_t[][size_t] symbolIdProductionIdsMap;
+  size_t[size_t] symbolIdTokenInfoIdMap;  // A symbol may map to 1 token.
+  size_t[][size_t] symbolIdProductionIdsMap;  // A symbol may map to many productions.
 
   this() {
     symbols ~= Symbol(Symbol.Type.START, "START");
@@ -110,9 +135,9 @@ public:
     symbols ~= Symbol(Symbol.Type.STOP, "LAMBDA");
     nameSymbolIdMap["LAMBDA"] = symbols.length - 1;
     LAMBDA_ID = symbols.length - 1;
-
   }
 
+  // Interperet a configuration line as a TokenInfo record.
   static bool readTokenInfo(in char[] line, TokenInfo* tokenInfo)
   {
       auto captures = matchFirst(line, tokenRegex);
@@ -123,14 +148,8 @@ public:
       return true;
   }
 
-  // Test1
   unittest
   {
-    assert(!isComment("Hello There"));
-    assert(isComment("#Hello There"));
-    assert(isComment("   "));
-    assert(isComment(""));
-
     TokenInfo ti;
 
     assert(readTokenInfo(r"LEVEL_START /^==+/", &ti));
@@ -141,7 +160,7 @@ public:
     assert(ti.name == "LEVEL_END");
     assert(matchFirst("hambo ====", ti.regex).empty);
     assert(!matchFirst("====", ti.regex).empty);
-    debug writeln("Test1 [OK]");
+    debug writeln("readTokenInfo [OK]");
   }
 
   /**
@@ -175,7 +194,10 @@ public:
     return true;
   }
 
-
+  /**
+   * Load full grammar configuration and store all symbols and productions.
+   * Any valid range may be used as an input, e.g. file.byLine() or string[].
+   */
   void load(T)(T range) if (isInputRange!T)
   {
     uint lineNumber = 0;
@@ -249,7 +271,6 @@ public:
     }
   }
 
-  // Test2
   unittest
   {
     Grammar g = new Grammar();
@@ -262,7 +283,7 @@ public:
     assert(g.tokenInfos.length == 2);
     assert(g.productions.length == 0);
     assert(g.symbols.length == 5);  // Don't forget "START", "STOP", and "LAMBDA".
-    debug writeln("Test2 [OK]");
+    debug writeln("load[1] [OK]");
   }
 
   // Test3
@@ -290,13 +311,14 @@ public:
     assert(g.symbolIdTokenInfoIdMap.length == 2);
     assert(g.symbolIdProductionIdsMap.length == 2);
     assert(g.symbolIdProductionIdsMap[g.nameSymbolIdMap["cat"]].length == 2);
-    debug writeln("Test3 [OK]");
+    debug writeln("load[2] [OK]");
   }
 
 public:
-  // Now some utility functions for determing useful properties of symbols.
+  // Utility data and functions used for complex grammar parsing.
   bool[] symbolDerivesLambda;
   Set!(size_t)[] symbolFirstSet;
+  Set!(size_t)[] symbolFollowSet;
 
   // Fill in data indicating if a production can derive LAMBDA.
   void initSymbolDerivesLambda()
@@ -356,7 +378,7 @@ public:
   }
 
   // Get the terminal symbol may be the first in a list of symbols.
-  Set!size_t computeFirstSet(in size_t[] symbolIds)
+  private Set!size_t computeFirstSet(in size_t[] symbolIds)
   in {
     assert(symbolFirstSet.length == symbols.length,
            "Call initSymbolFirstSet before calling computeFirstSet!");
@@ -387,10 +409,10 @@ public:
   // Performance may be performed for sets with known max sizes by using
   // a bit-vector.  Consider std.container.Array!bool
   void initSymbolFirstSet()
-  in {
-    assert(symbolDerivesLambda.length == symbols.length,
-           "Call initDerivesLambda before initSymbolFirstSet!");
-  }
+    in {
+      assert(symbolDerivesLambda.length == symbols.length,
+             "Call initDerivesLambda before initSymbolFirstSet!");
+    }
   body {
     symbolFirstSet.length = symbols.length;
 
@@ -460,5 +482,96 @@ public:
 
     debug writeln("initSymbolFirstSet [OK]");
   }
-}
 
+  /**
+   * Compute the set of symbols that may come after a non-terminal in the grammar.
+   *
+   * For non-terminal symbols (productions), the follow-set is constructed
+   * by looking at instances where the non-terminal is on the right side
+   * of a production, and then looking at the first-set of the symbol
+   * to its right.
+   */
+  void initSymbolFollowSet()
+    in {
+      assert(symbolDerivesLambda.length == symbols.length,
+             "initSymbolFollowSet depends upon initSymbolDerivesLambda!");
+      assert(symbolFirstSet.length == symbols.length,
+             "initSymbolFollowSet depends upon initSymbolFirstSet!");
+    }
+  body {
+    symbolFollowSet.length = symbols.length;
+
+    // Initialize the follow-set of non-terminal symbols to be an empty set.
+    // TODO:  Multiple productions may have the same symbol, revise our data.
+    foreach (production; productions) {
+      symbolFollowSet[production.symbolId] = new Set!size_t();
+    }
+
+    // No symbol may follow the start symbol, LAMBDA indicates this.
+    auto startId = productions[0].symbolId;  // TODO:  Always use first production?
+    symbolFollowSet[startId] = new Set!size_t();
+    symbolFollowSet[startId].add(LAMBDA_ID);
+
+    // Because the follow-set of a non-terminal can depend on the follow-set
+    // of the left-side of any production it is in, we must iterate several
+    // times until no changes are made.
+    bool isChange;
+    do {
+      isChange = false;
+      foreach (production; productions) {
+        foreach (prodSymIndex, prodSymId; production.symbolIds) {
+          // We are only processing non-terminals.
+          if (symbols[prodSymId].type != Symbol.Type.PRODUCTION)
+            continue;
+
+          // Save the size so we can check for changes.
+          auto followSetSize = symbolFollowSet[prodSymId].size();
+
+          auto rightFirstSet =
+            computeFirstSet(production.symbolIds[prodSymIndex + 1 .. $]);
+          bool rightDerivesLambda = rightFirstSet.contains(LAMBDA_ID);
+          rightFirstSet.remove(LAMBDA_ID);
+
+          // The symbols in the first-set of what follows this production
+          // can be part of its follow set with the exception of LAMBDA.
+          symbolFollowSet[prodSymId].add(rightFirstSet);
+
+          // If the content to the right can be empty, add the follow-set
+          // of the symbol on the left side of a production.
+          if (rightDerivesLambda)
+            symbolFollowSet[prodSymId].add(symbolFollowSet[production.symbolId]);
+
+          // Check for changes.
+          if (followSetSize != symbolFollowSet[prodSymId].size())
+            isChange = true;
+        }
+      }
+    } while (isChange);
+  }
+
+  unittest
+  {
+    auto g = new Grammar();
+    g.load(grammarConfig);
+    g.initSymbolDerivesLambda();
+    g.initSymbolFirstSet();
+    g.initSymbolFollowSet();
+
+    auto E_followSet = g.symbolFollowSet[g.nameSymbolIdMap["E"]];
+    writeln("E_followSet = ", E_followSet.toArray());
+    assert(E_followSet.size() == 2);
+    assert(E_followSet.contains(g.LAMBDA_ID));
+    assert(E_followSet.contains(g.nameSymbolIdMap["RPAREN"]));
+
+    auto PREFIX_followSet = g.symbolFollowSet[g.nameSymbolIdMap["PREFIX"]];
+    assert(PREFIX_followSet.size() == 1);
+    assert(PREFIX_followSet.contains(g.nameSymbolIdMap["LPAREN"]));
+
+    auto TAIL_followSet = g.symbolFollowSet[g.nameSymbolIdMap["TAIL"]];
+    assert(TAIL_followSet.size() == 2);
+    assert(TAIL_followSet.contains(g.LAMBDA_ID));
+    assert(TAIL_followSet.contains(g.nameSymbolIdMap["RPAREN"]));
+
+    debug writeln("initFollowSet [OK]");
+  }
+}
