@@ -100,7 +100,7 @@ class Scanner
       auto captures = matchFirst(line[linePos .. $], tokenInfos[i].regex);
       if (!captures.empty &&
           (tokenInfos[i].lineStart == false || linePos == 0)) {
-        token.id = i;
+        token.id = tokenInfos[i].symbolId;
         token.text = captures.front;
         captures.popFront();
         while (!captures.empty) {

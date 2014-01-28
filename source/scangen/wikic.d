@@ -100,12 +100,13 @@ EOS";
   writeln("== Scanner output ==");
   scanner.load(text);
   Token token;
-  while (!scanner.empty()) {
+  do {
     token = scanner.getToken();
-    writeln(tokenInfos[token.id].name, " => ", token.text);
+
+    writeln(grammar.symbols[token.id].name, " => ", token.text);
+    writeln("  ", token);
     foreach (i, group; token.groups) {
-      writeln("  Group ", i, ": ", group);
+      writeln("    Group ", i, ": ", group);
     }
-  }
-  writeln(token);
+  } while (token.id != grammar.STOP_ID);
 }
