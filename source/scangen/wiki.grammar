@@ -13,6 +13,7 @@
 # at the bottom of the list!
 
 EMPTY_LINE         /^$/
+END_LINE           /$/
 LEVEL_OPEN         /^==+/
 LEVEL_CLOSE        /==+$/
 BOLD_ITALIC        /'''''/
@@ -50,26 +51,25 @@ wiki => statement_list
 
 #statement_list => statement {statement}
 statement_list => statement statement_list_tail
-statement_list_tail => LAMBDA
+statement_list_tail =>
 statement_list_tail => statement statement_list_tail
 
-statement => line_statement
-statement => inline_statement_list
+statement => LEVEL_OPEN statement2_list LEVEL_CLOSE END_LINE
+statement => EMPTY_LINE
+statement => BULLET_LIST statement2_list END_LINE
+statement => NUMBER_LIST statement2_list END_LINE
+statement => statement2_list
 
-line_statement => LEVEL_OPEN inline_statement_list LEVEL_CLOSE
-line_statement => EMPTY_LINE
-line_statement => BULLET_LIST inline_statement_list
-line_statement => NUMBER_LIST inline_statement_list
+#statement2_list => statement2 {statement2}
+statement2_list => statement2_list_tail
+statement2_list_tail => END_LINE
+statement2_list_tail => statement2 statement2_list_tail
 
-#inline_statement_list => inline_statement {inline_statement}
-inline_statement_list => inline_statement inline_statement_list_tail
-inline_statement_list_tail => LAMBDA
-inline_statement_list_tail => inline_statement inline_statement_list_tail
+statement2 => LINK
+statement2 => TAG_OPEN statement TAG_CLOSE
+statement2 => TEXT
+statement2 => statement3
 
-inline_statement => BOLD_ITALIC TEXT BOLD_ITALIC
-inline_statement => BOLD TEXT BOLD
-inline_statement => ITALIC TEXT ITALIC
-inline_statement => LINK
-inline_statement => TAG_OPEN inline_statement TAG_CLOSE
-inline_statement => TEXT
-
+statement3 => BOLD_ITALIC TEXT BOLD_ITALIC
+statement3 => BOLD TEXT BOLD
+statement3 => ITALIC TEXT ITALIC

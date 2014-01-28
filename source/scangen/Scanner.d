@@ -1,5 +1,6 @@
 import std.conv;
 import std.regex;
+import std.uni;
 import std.string;
 import std.stdio;
 
@@ -24,14 +25,16 @@ class ScannerException : Exception
 class Scanner
 {
   TokenInfo[] tokenInfos;
+  Token stopToken;
 
   size_t lineNum = 0;
   size_t linePos = 0;
   string[] lines;
 
-  this(TokenInfo[] tokenInfos)
+  this(TokenInfo[] tokenInfos, size_t stopSymbolId)
   {
     this.tokenInfos = tokenInfos;
+    this.stopToken = Token.Token(stopSymbolId);
   }
 
   void load(string input)
@@ -40,27 +43,38 @@ class Scanner
     lineNum = 0;
     linePos = 0;
 
-    skipWhite();  // Position our read at the first potential token.
+    skipSpace();  // Position our read at the first potential token.
   }
 
   void skip(size_t num)
   {
     if (empty())
       return;
-    linePos += num;
     if (lineNum < lines.length && linePos >= lines[lineNum].length) {
       linePos = linePos - lines[lineNum].length;
       lineNum++;
     }
+    linePos += num;
   }
 
   // Skip past all consecutive whitespace.
   void skipWhite()
   {
-    while (!empty() && lines[lineNum].length > 0 && isWhite(lines[lineNum][linePos])) {
+    while (!empty() && lines[lineNum].length > 0 &&
+           (linePos == lines[lineNum].length || isWhite(lines[lineNum][linePos]))) {
       skip(1);
     }
   }
+
+  // Skip past all consecutive space.
+  void skipSpace()
+  {
+    while (!empty() && lines[lineNum].length > 0 &&
+           linePos < lines[lineNum].length && isSpace(lines[lineNum][linePos])) {
+      skip(1);
+    }
+  }
+
 
   bool empty()
   {
@@ -70,9 +84,14 @@ class Scanner
 
   Token getToken()
     in {
-      assert(empty() || lines[lineNum].length == 0 || !isWhite(lines[lineNum][linePos]));
+      assert(empty() || lines[lineNum].length == 0 ||
+             linePos == lines[lineNum].length || !isWhite(lines[lineNum][linePos]));
     }
   body {
+    // If there is no input left, issue a stop token.
+    if (empty())
+      return stopToken;
+
     Token token;
     string line = lines[lineNum];
     // Iterate through tokens to see which one matches.
@@ -98,7 +117,7 @@ class Scanner
                                  "\n  --> " ~ line[linePos .. $]);
 
     // Prepare for the next call to getToken() or hasToken().
-    skipWhite();
+    skipSpace();
 
     return token;
   }

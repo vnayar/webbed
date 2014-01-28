@@ -7,8 +7,19 @@ import Token;
 import TokenInfo;
 import Grammar;
 import Scanner;
-import LR0ParserGenerator;
+import LR1ParserGenerator;
 
+
+void printHelp()
+{
+  writeln(q"EOS
+Program:  wikic [-h|--help] [-c|--config grammarFile]
+  --config grammarFile
+    Specify what grammar configuration file to load.
+  --help
+    If set, display this usage information and quit.
+EOS");
+}
 
 /**
  * Program that reads an input file in wiki format, and converts
@@ -17,9 +28,17 @@ import LR0ParserGenerator;
 void main(string[] args)
 {
   string configFileName = "wiki.grammar";
+  bool help = false;
 
   getopt(args,
-         "config|c", &configFileName);  // string
+         "config|c", &configFileName,  // string
+         "help|h", &help);      // bool
+
+  // Show help and quit if requested.
+  if (help) {
+    printHelp();
+    return;
+  }
 
   Grammar grammar = new Grammar();
 
@@ -27,6 +46,10 @@ void main(string[] args)
   auto file = File(configFileName, "r");
   writeln("Loading grammar from file: ", configFileName);
   grammar.load(file.byLine());
+  grammar.initSymbolDerivesLambda();
+  grammar.initSymbolFirstSet();
+  grammar.initSymbolFollowSet();
+
 
   writeln("Found the following symbols:  ");
   foreach (symbolId, symbol; grammar.symbols) {
@@ -34,7 +57,7 @@ void main(string[] args)
     writeln("  name ", symbol.name, " ==> ", grammar.nameSymbolIdMap[symbol.name]);
     if (symbol.type == Symbol.Type.PRODUCTION)
       writeln("  Productions:  ", grammar.symbolIdProductionIdsMap[symbolId]);
-    else if (symbol.type == Symbol.Type.TOKEN)
+    else if (symbol.type == Symbol.Type.TOKEN && symbolId in grammar.symbolIdTokenInfoIdMap)
       writeln("  Token: ", grammar.symbolIdTokenInfoIdMap[symbolId]);
   }
 
@@ -45,14 +68,14 @@ void main(string[] args)
     writeln(join(map!(s => grammar.symbols[s].name)(production.symbolIds), " "));
   }
 
-  auto pg = new LR0ParserGenerator(grammar);
+  auto pg = new LR1ParserGenerator(grammar);
   auto cfsm = pg.buildCFSM();
   cfsm.printStates();
   auto gotoTable = pg.buildGotoTable(cfsm);
   auto actionTable = pg.buildActionTable(cfsm);
 
   TokenInfo[] tokenInfos = grammar.tokenInfos;
-  Scanner scanner = new Scanner(tokenInfos);
+  Scanner scanner = new Scanner(tokenInfos, grammar.STOP_ID);
 
   string text = q"EOS
 This is some sample text with ''bold'' and '''italics'''.

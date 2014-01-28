@@ -108,6 +108,23 @@ private:
 
   }
 
+  string toString(in Configuration conf) const
+  {
+    string str;
+    auto prod = grammar.productions[conf.productionId];
+    str ~= grammar.symbols[prod.symbolId].name ~ " => ";
+    foreach (symbolIndex, symbolId; prod.symbolIds) {
+      if (symbolIndex == conf.dotIndex)
+        str ~= ". ";
+      str ~= grammar.symbols[symbolId].name ~ " ";
+    }
+    if (conf.dotIndex == prod.symbolIds.length)
+      str ~= ". ";
+    str ~= ", " ~ grammar.symbols[conf.lookAhead].name;
+
+    return str;
+  }
+
   void print(in Configuration conf) const
   {
     auto prod = grammar.productions[conf.productionId];
@@ -247,8 +264,6 @@ public:
           confProd.symbolIds[conf.dotIndex] == symbolId) {
         auto newConf = Configuration(conf.productionId, conf.dotIndex + 1,
                                      conf.lookAhead);
-        // Automatically skip LAMBDA symbols.
-        //while (skipSymbol(newConf, grammar.LAMBDA_ID)) {}
         successorSet.add(newConf);
       }
     }
@@ -298,6 +313,22 @@ public:
     invariant()
     {
       assert(states.length == transitions.length);
+    }
+
+    string toString(size_t stateId) const
+    {
+      auto state = states[stateId];
+
+      string str;
+      str ~= "State " ~ to!string(stateId) ~ "\n";
+      str ~= "==========\n";
+      // Display the configurations in this state.
+      foreach (conf; state.toArray()) {
+        str ~= LR1ParserGenerator.toString(conf) ~ "\n";
+      }
+      str ~= "\n";
+
+      return str;
     }
 
     void printStates() const
@@ -468,8 +499,9 @@ public:
             throw new ParserGeneratorException(
                 "Grammar is not LR1!  " ~
                 to!string(actionTable[stateId][conf.lookAhead].type) ~
-                "-REDUCE conflict in state " ~ to!string(stateId) ~
-                ", lookAhead=" ~ grammar.symbols[conf.lookAhead].name);
+                "-REDUCE conflict in state " ~ to!string(stateId) ~ ".\n" ~
+                "Configuration: " ~ toString(conf) ~ "\n" ~
+                cfsm.toString(stateId));
 
           actionTable[stateId][conf.lookAhead] =
             Action(Action.Type.REDUCE, conf.productionId);
@@ -484,11 +516,14 @@ public:
             // If there is already a shift, pass this configuration.
             if (actionTable[stateId][nextSymbolId].type == Action.Type.ACCEPT ||
                 actionTable[stateId][nextSymbolId].type == Action.Type.REDUCE) {
+              debug writeln("Error detected in conf:");
+              debug print(conf);
               throw new ParserGeneratorException(
                   "Grammar is not LR1!  " ~
                   to!string(actionTable[stateId][nextSymbolId].type) ~
-                  "-SHIFT conflict in state " ~ to!string(stateId) ~
-                  ", lookAhead=" ~ grammar.symbols[conf.lookAhead].name);
+                  "-SHIFT conflict in state " ~ to!string(stateId) ~ ".\n" ~
+                  "Configuration: " ~ toString(conf) ~ "\n" ~
+                  cfsm.toString(stateId));
             }
 
             if (nextSymbolId == grammar.STOP_ID)
