@@ -1,12 +1,14 @@
 import std.stdio;
 import std.algorithm;
+import std.conv;
 
 import container;
 import Grammar;
 
+
+// Introduce some test data to be used for unittests.
 version(unittest)
 {
-  // Introduce some test data to be used for unittests.
   Grammar g1;
   static this() {
     g1 = new Grammar();
@@ -29,6 +31,34 @@ version(unittest)
     g1.initSymbolFirstSet();
     g1.initSymbolFollowSet();
   }
+
+  // A more complex grammar that is LR(1) and not LR(0).
+  Grammar g3;
+  static this() {
+    g3 = new Grammar();
+    string[] grammarConfig =
+      [
+       r"# Tokens",
+       r"PLUS /\+/",
+       r"MUL /\*/",
+       r"ID   /\w+/",
+       r"LPAREN /\(/",
+       r"RPAREN /\)/",
+       r"= Productions =",
+       r"S => E STOP",
+       r"E => E PLUS T",
+       r"E => T",
+       r"T => T MUL P",
+       r"T => P",
+       r"P => ID",
+       r"P => LPAREN E RPAREN"
+       ];
+    g3.load(grammarConfig);
+    g3.initSymbolDerivesLambda();
+    g3.initSymbolFirstSet();
+    g3.initSymbolFollowSet();
+  }
+
 }
 
 class ParserGeneratorException : Exception
@@ -92,19 +122,6 @@ private:
     writeln(", ", grammar.symbols[conf.lookAhead].name);
   }
 
-  /*
-  bool skipSymbol(ref Configuration conf, size_t symbolId)
-  {
-    const auto symbolIds = grammar.productions[conf.productionId].symbolIds;
-    if (conf.dotIndex < symbolIds.length && symbolIds[conf.dotIndex] == symbolId) {
-      conf.dotIndex += 1;
-      return true;
-    }
-    return false;
-  }
-  */
-
-
   /**
    * A set of configurations who all have the same symbols matched so far.
    * That is, all symbols before the "dot" in each configuration are the same.
@@ -127,12 +144,10 @@ public:
   void closure1(ConfigurationSet set)
   {
     bool isNewConf;
-    debug writeln("Calling closure1 with set: ", set.toArray());
     do {
       isNewConf = false;
       // Check all configurations in our configuration set.
       foreach (conf; set.toArray()) {
-        debug writeln("Checking conf ", conf);
         auto confProd = &grammar.productions[conf.productionId];
         // We want configurations of the form:  B => a . A p, l
         // where A is a production, l is the lookahead,
@@ -151,7 +166,6 @@ public:
         auto lookAheadSet =
           grammar.computeFirstSet(confProd.symbolIds[conf.dotIndex + 1 .. $] ~
                                   conf.lookAhead);
-        debug writeln("Found lookAheadSet = ", lookAheadSet.toArray());
 
         // Remember that a production symbol maps to many productions.
         foreach (productionId; grammar.symbolIdProductionIdsMap[symbolId]) {
@@ -177,15 +191,19 @@ public:
     auto set = new ConfigurationSet();
     // A configuration using the first production with dot before the start.
     set.add(Configuration(0, 0, g1.LAMBDA_ID));
-    writeln("==== Initial configuration set ====");
-    foreach (conf; set.toArray()) {
-      pg.print(conf);
+    debug (3) {
+      writeln("==== Initial configuration set ====");
+      foreach (conf; set.toArray()) {
+        pg.print(conf);
+      }
     }
     debug writeln("set.size() = ", set.size());
     pg.closure1(set);
-    writeln("==== Closure configuration set ====");
-    foreach (conf; set.toArray()) {
-      pg.print(conf);
+    debug (3) {
+      writeln("==== Closure configuration set ====");
+      foreach (conf; set.toArray()) {
+        pg.print(conf);
+      }
     }
     debug writeln("set.size() = ", set.size());
     assert(set.size() == 9);
@@ -321,15 +339,13 @@ public:
   body {
     CFSM cfsm = new CFSM();
 
-    // Create an error state in the CFSM with an empty configuration set.
+    // State 0 is the error state in the CFSM with an empty configuration set.
     ConfigurationSet error = new ConfigurationSet();
     cfsm.addState(error);
 
-    // Create a start state in the CFSM that matches the first production.
+    // State 1 is the start state in the CFSM that matches the first production.
     ConfigurationSet start = new ConfigurationSet();
-    debug writeln("TEST A:  grammar.productions = ", grammar.productions);
-    //start.add(Configuration(grammar.productions[0].symbolId, 0));
-    start.add(Configuration(0, 0));
+    start.add(Configuration(0, 0, grammar.LAMBDA_ID));
     closure1(start);
     int startStateId = cfsm.addState(start);
 
@@ -347,7 +363,7 @@ public:
         auto newStateId = cfsm.findStateIndex(successor);
         if (newStateId == -1) {
           newStateId = cfsm.addState(successor);
-          writeln("Adding new state ", newStateId);
+          debug (3) writeln("Adding new state ", newStateId);
           workingStateIds.push(newStateId);
         }
         // Create a transition from the working state to our new state.
@@ -374,21 +390,23 @@ public:
 
   unittest
   {
-    auto pg = new LR1ParserGenerator(g1);
+    auto pg = new LR1ParserGenerator(g3);
     auto cfsm = pg.buildCFSM();
 
     debug writeln("cfsm.states.length = ", cfsm.states.length);
-    cfsm.printStates();
-    assert(cfsm.states.length == 11);
+    debug cfsm.printStates();
+    assert(cfsm.states.length == 24);
 
     debug writeln("buildCFSM [OK]");
 
     // Now test the buildGotoTable function.
     auto gotoTable = pg.buildGotoTable(cfsm);
-    assert(gotoTable.length == 11);
-    size_t ID_id = g1.nameSymbolIdMap["ID"];
-    size_t STOP_id = g1.nameSymbolIdMap["STOP"];
-    size_t E_id = g1.nameSymbolIdMap["E"];
+    assert(gotoTable.length == 24);
+    size_t ID_id = g3.nameSymbolIdMap["ID"];
+    size_t STOP_id = g3.nameSymbolIdMap["STOP"];
+    size_t PLUS_id = g3.nameSymbolIdMap["PLUS"];
+    size_t MUL_id = g3.nameSymbolIdMap["MUL"];
+    size_t E_id = g3.nameSymbolIdMap["E"];
 
     // State 0 is the error state.
     assert(gotoTable[0][ID_id] == 0);
@@ -399,18 +417,23 @@ public:
     //  #0  S => . E STOP
     //  #1  E => . E PLUS T
     //  #2  E => . T
-    //  #3  T => . ID
-    //  #4  T => . LPAREN E RPAREN
+    //  #3  T => . T MUL P
+    //  #4  T => . P
+    //  #5  P => . ID
+    //  #6  P => . LPAREN E RPAREN
     size_t stateId = 1;
 
     // Make sure the transition on ID has:
-    //   T => ID .
-    assert(cfsm.states[gotoTable[stateId][ID_id]].contains(Configuration(3, 1)));
-    // The startId has no transition on STOP.
-    assert(gotoTable[stateId][STOP_id] == 0);  // The error state
+    //   P => ID .
+    assert(cfsm.states[gotoTable[stateId][ID_id]].contains(Configuration(5, 1, PLUS_id)));
+    assert(cfsm.states[gotoTable[stateId][ID_id]].contains(Configuration(5, 1, MUL_id)));
+    assert(cfsm.states[gotoTable[stateId][ID_id]].contains(Configuration(5, 1, STOP_id)));
     // Make sure the transition on E has:
     //   S => E . STOP
-    assert(cfsm.states[gotoTable[stateId][E_id]].contains(Configuration(0, 1)));
+    assert(cfsm.states[gotoTable[stateId][E_id]].contains(Configuration(0, 1, g3.LAMBDA_ID)));
+    // The startId has no transition on STOP.
+    assert(gotoTable[stateId][STOP_id] == 0);  // The error state
+
 
     debug writeln("buildGotoTable [OK]");
   }
@@ -419,54 +442,62 @@ public:
    * Build the action table that indicates what action to perform for
    * a given state.  Actions may be: SHIFT, ACCEPT, REDUCE, or ERROR.
    */
-  Action[] buildActionTable(CFSM cfsm)
+  Action[][] buildActionTable(CFSM cfsm)
   {
-    Action[] actionTable;
+    // The action for [stateId][lookaheadSymbolId].
+    Action[][] actionTable;
     actionTable.length = cfsm.states.length;
     // For each state, check for possible end conditions.
     foreach (stateId, state; cfsm.states) {
-      uint shiftCount = 0;
-      uint reduceCount = 0;
+      // Remember that lookahead symbols may only be terminal symbols.
+      // TODO:  Fix this so the terminal symbol count is not a magic number.
+      actionTable[stateId].length = grammar.tokenInfos.length + 3;
+      // Initialize each action for each lookahead to ERROR.
+      foreach (i; 0 .. actionTable[stateId].length) {
+        actionTable[stateId][i] = Action(Action.Type.ERROR);
+      }
+
       // Check if a Configuration has been completed.
       foreach (conf; state.toArray()) {
         auto prod = &grammar.productions[conf.productionId];
         // We found a completed Configuration.
         if (conf.dotIndex == prod.symbolIds.length) {
-          if (reduceCount > 0)
-            throw new ParserGeneratorException("Grammar is not LR0!  "
-                                               "Reduce-Reduce conflict in "
-                                               "state " ~ to!string(stateId));
-          if (shiftCount > 0)
-            throw new ParserGeneratorException("Grammar is not LR0!  "
-                                               "Shift-Reduce conflict in "
-                                               "state " ~ to!string(stateId));
-          // The first production is our target.
-          if (conf.productionId == 0)
-            actionTable[stateId] = Action(Action.Type.ACCEPT, conf.productionId);
-          else
-            actionTable[stateId] = Action(Action.Type.REDUCE, conf.productionId);
-          reduceCount++;
+          // Check to see if an action has already been set.
+          if (actionTable[stateId][conf.lookAhead].type == Action.Type.ACCEPT ||
+              actionTable[stateId][conf.lookAhead].type == Action.Type.SHIFT)
+            throw new ParserGeneratorException(
+                "Grammar is not LR1!  " ~
+                to!string(actionTable[stateId][conf.lookAhead].type) ~
+                "-REDUCE conflict in state " ~ to!string(stateId) ~
+                ", lookAhead=" ~ grammar.symbols[conf.lookAhead].name);
+
+          actionTable[stateId][conf.lookAhead] =
+            Action(Action.Type.REDUCE, conf.productionId);
         }
-        // Keep checking to make sure there are no errors.
-        // Check to see if there is a production with a nonterminal.
-        writeln("Checking actions for state ", stateId);
+        // Keep checking to look for SHIFT actions (even if an action already
+        // exists, this can detect errors).
         if (conf.dotIndex < prod.symbolIds.length) {
           auto nextSymbolId = prod.symbolIds[conf.dotIndex];
-          writeln("Next symbol is ", grammar.symbols[nextSymbolId]);
           auto nextSymbolType = grammar.symbols[nextSymbolId].type;
+          // Check to see if there is a production with a nonterminal after the dot.
           if (nextSymbolType == Symbol.Type.TOKEN) {
-            if (reduceCount > 0)
-              throw new ParserGeneratorException("Grammar is not LR0!  "
-                                                 "Shift-Reduce conflict in "
-                                                 "state " ~ to!string(stateId));
-            actionTable[stateId] = Action(Action.Type.SHIFT);
-            shiftCount++;
+            // If there is already a shift, pass this configuration.
+            if (actionTable[stateId][nextSymbolId].type == Action.Type.ACCEPT ||
+                actionTable[stateId][nextSymbolId].type == Action.Type.REDUCE) {
+              throw new ParserGeneratorException(
+                  "Grammar is not LR1!  " ~
+                  to!string(actionTable[stateId][nextSymbolId].type) ~
+                  "-SHIFT conflict in state " ~ to!string(stateId) ~
+                  ", lookAhead=" ~ grammar.symbols[conf.lookAhead].name);
+            }
+
+            if (nextSymbolId == grammar.STOP_ID)
+              actionTable[stateId][nextSymbolId] = Action(Action.Type.ACCEPT);
+            else
+              actionTable[stateId][nextSymbolId] = Action(Action.Type.SHIFT);
           }
         }
       }
-      // If no condition was satisfied, then the action is error.
-      if (shiftCount + reduceCount == 0)
-        actionTable[stateId] = Action(Action.Type.ERROR);
     }
     return actionTable;
   }
@@ -474,47 +505,53 @@ public:
   unittest
   {
     debug writeln("Building CFSM for actionTable test.");
-    auto pg = new LR1ParserGenerator(g1);
+    auto pg = new LR1ParserGenerator(g3);
     auto cfsm = pg.buildCFSM();
-    cfsm.printStates();
+    debug cfsm.printStates();
 
-    // Grammar has a shift-reduce conflict in the initial state due to LAMBDA
-    // production (which can be reduced) and presense of shiftable token.
     auto actionTable = pg.buildActionTable(cfsm);
-    debug writeln("Action Table");
-    debug writeln("============");
-    debug writeln(actionTable);
+    debug {
+      writeln("Action Table");
+      writeln("============");
+      foreach (i; 0 .. actionTable[0].length) {
+        write(g3.symbols[i].name, " ");
+      }
+      writeln();
+      foreach (i, row; actionTable) {
+        writeln("State ", i, ": ", row);
+      }
+    }
 
-    // Find 4 different states based upon the ConfigurationSet.
+    auto ID_ID = g3.nameSymbolIdMap["ID"];
+    auto E_ID = g3.nameSymbolIdMap["E"];
+    auto PLUS_ID = g3.nameSymbolIdMap["PLUS"];
+    auto MUL_ID = g3.nameSymbolIdMap["MUL"];
+
+    // Find a known ConfigurationSet with ACCEPT and SHIFT actions.
     auto cs1 = new ConfigurationSet();
-    cs1.add(Configuration(1, 2));  // E => E PLUS . T
-    cs1.add(Configuration(3, 0));  // T => . ID
-    cs1.add(Configuration(4, 0));  // T => . LPAREN E RPAREN
+    cs1.add(Configuration(0, 1, g3.LAMBDA_ID)); // S => E . STOP, LAMBDA
+    cs1.add(Configuration(1, 1, g3.STOP_ID));   // E => E . PLUS T, STOP
+    cs1.add(Configuration(1, 1, PLUS_ID));      // E => E . PLUS T, PLUS
     auto cs1i = cfsm.findStateIndex(cs1);
     assert(cs1i != -1);
-    writeln("Checking state ", cs1i);
-    assert(actionTable[cs1i] == Action(Action.Type.SHIFT));
+    debug writeln("Checking state ", cs1i);
+    assert(actionTable[cs1i][g3.STOP_ID] == Action(Action.Type.ACCEPT));
+    assert(actionTable[cs1i][PLUS_ID] == Action(Action.Type.SHIFT));
+    assert(actionTable[cs1i][MUL_ID] == Action(Action.Type.ERROR));
 
-    auto cs2 = new ConfigurationSet();
-    cs2.add(Configuration(1, 3));  // E => E PLUS T .
-    auto cs2i = cfsm.findStateIndex(cs2);
-    assert(cs2i != -1);
-    writeln("Checking state ", cs2i);
-    assert(actionTable[cs2i] == Action(Action.Type.REDUCE, 1));
-
-    auto cs3 = new ConfigurationSet();  // Empty set is the error state.
-    auto cs3i = cfsm.findStateIndex(cs3);
-    assert(cs3i != -1);
-    writeln("Checking state ", cs3i);
-    assert(actionTable[cs3i] == Action(Action.Type.ERROR));
-
-
-    auto cs4 = new ConfigurationSet();
-    cs4.add(Configuration(0, 2));  // S => E STOP .
-    auto cs4i = cfsm.findStateIndex(cs4);
-    assert(cs4i != -1);
-    writeln("Checking state ", cs4i);
-    assert(actionTable[cs4i] == Action(Action.Type.ACCEPT, 0));
+    // Find a known configuration set with REDUCE[i] actions.
+    auto cs7 = new ConfigurationSet();
+    cs7.add(Configuration(2, 1, g3.STOP_ID));  // E => T ., STOP
+    cs7.add(Configuration(2, 1, PLUS_ID));     // E => T ., PLUS
+    cs7.add(Configuration(3, 1, g3.STOP_ID));  // T => T . MUL P, STOP
+    cs7.add(Configuration(3, 1, PLUS_ID));     // T => T . MUL P, PLUS
+    cs7.add(Configuration(3, 1, MUL_ID));      // T => T . MUL P, MUL
+    auto cs7i = cfsm.findStateIndex(cs7);
+    assert(cs7i != -1);
+    debug writeln("Checking state ", cs7i);
+    assert(actionTable[cs7i][PLUS_ID] == Action(Action.Type.REDUCE, 2));
+    assert(actionTable[cs7i][MUL_ID] == Action(Action.Type.SHIFT));
+    assert(actionTable[cs7i][ID_ID] == Action(Action.Type.ERROR));
 
     debug writeln("buildActionTable [OK]");
   }

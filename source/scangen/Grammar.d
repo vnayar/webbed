@@ -182,7 +182,7 @@ public:
 
     string productionText = captures[2];
     foreach (name; split(productionText)) {
-      debug writeln("  name=", name);
+      debug (3) writeln("  name=", name);
       if (name !in nameSymbolIdMap)
         throw new GrammarException("Reference to unknown symbol " ~ name ~
                                    " in line " ~ line);
@@ -206,7 +206,7 @@ public:
     while (!range.empty()) {
       string line = to!string(range.front());
       range.popFront();
-      writeln("line is: ", line);
+      debug (3) writeln("line is: ", line);
       lineNumber++;
 
       // Check for comment lines and skip them.
@@ -330,7 +330,7 @@ public:
     do {
       isChange = false;
       foreach (production; productions) {
-        writeln("Working on production:  ", production);
+        debug writeln("Working on production:  ", production);
         if (!symbolDerivesLambda[production.symbolId]) {
           // Check if the production is itself lambda (empty).
           if (production.symbolIds.length == 0) {
@@ -385,7 +385,6 @@ public:
            "Call initSymbolFirstSet before calling computeFirstSet!");
   }
   body {
-    debug writeln("computeFirstSet start, symbolIds=", symbolIds);
     auto result = new Set!size_t();
     if (symbolIds.length == 0) {
       result.add(LAMBDA_ID);  // An empty list may derive lambda.
@@ -393,9 +392,7 @@ public:
     }
 
     bool canBeLambda = true;
-    debug writeln("Test point alpha: symbolIds = ", symbolIds);
     result.add(symbolFirstSet[symbolIds[0]]);
-    debug writeln("Test point bravo");
     for (auto i = 0; i < symbolIds.length && canBeLambda; i++) {
       auto firstSet = symbolFirstSet[symbolIds[i]];
       result.add(firstSet);
@@ -406,7 +403,6 @@ public:
       }
     }
 
-    debug writeln("computeFirstSet end");
     return result;
   }
 
@@ -511,7 +507,7 @@ public:
              "initSymbolFollowSet depends upon initSymbolFirstSet!");
     }
   body {
-    debug writeln("initSymbolFollowSet start");
+    debug (3) writeln("initSymbolFollowSet start");
     symbolFollowSet.length = symbols.length;
 
     // Initialize the follow-set of non-terminal symbols to be an empty set.
@@ -520,7 +516,6 @@ public:
       symbolFollowSet[production.symbolId] = new Set!size_t();
     }
 
-    debug writeln("Test A");
     // No symbol may follow the start symbol, LAMBDA indicates this.
     auto startId = productions[0].symbolId;  // TODO:  Always use first production?
     symbolFollowSet[startId] = new Set!size_t();
@@ -528,7 +523,6 @@ public:
     symbolFollowSet[STOP_ID] = new Set!size_t();
     symbolFollowSet[STOP_ID].add(LAMBDA_ID);
 
-    debug writeln("Test B");
     // Because the follow-set of a non-terminal can depend on the follow-set
     // of the left-side of any production it is in, we must iterate several
     // times until no changes are made.
@@ -541,26 +535,18 @@ public:
           if (symbols[prodSymId].type != Symbol.Type.PRODUCTION)
             continue;
 
-          debug writeln("Test C");
           // Save the size so we can check for changes.
           auto followSetSize = symbolFollowSet[prodSymId].size();
-          debug writeln("Test C2");
-          debug writeln("  production.symbolId = ", production.symbolId);
-          debug writeln("  production.symbolIds = ", production.symbolIds);
-          debug writeln("  prodSymIndex = ", prodSymIndex);
 
           auto rightFirstSet =
             computeFirstSet(production.symbolIds[prodSymIndex + 1 .. $]);
-          debug writeln("Test C3");
           bool rightDerivesLambda = rightFirstSet.contains(LAMBDA_ID);
           rightFirstSet.remove(LAMBDA_ID);
-          debug writeln("Test C4");
 
           // The symbols in the first-set of what follows this production
           // can be part of its follow set with the exception of LAMBDA.
           symbolFollowSet[prodSymId].add(rightFirstSet);
 
-          debug writeln("Test D");
           // If the content to the right can be empty, add the follow-set
           // of the symbol on the left side of a production.
           if (rightDerivesLambda)
@@ -572,7 +558,7 @@ public:
         }
       }
     } while (isChange);
-    debug writeln("initSymbolFollowSet end");
+    debug (3) writeln("initSymbolFollowSet end");
   }
 
   unittest
@@ -584,7 +570,7 @@ public:
     g.initSymbolFollowSet();
 
     auto E_followSet = g.symbolFollowSet[g.nameSymbolIdMap["E"]];
-    writeln("E_followSet = ", E_followSet.toArray());
+    debug writeln("E_followSet = ", E_followSet.toArray());
     assert(E_followSet.size() == 2);
     assert(E_followSet.contains(g.LAMBDA_ID));
     assert(E_followSet.contains(g.nameSymbolIdMap["RPAREN"]));
