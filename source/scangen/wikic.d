@@ -1,5 +1,3 @@
-import std.algorithm : map;
-import std.array : join;
 import std.stdio;
 import std.getopt;
 
@@ -8,6 +6,7 @@ import TokenInfo;
 import Grammar;
 import Scanner;
 import LR1ParserGenerator;
+import LRParser;
 
 
 void printHelp()
@@ -63,16 +62,8 @@ void main(string[] args)
 
   writeln("Found the following productions:  ");
   foreach (production; grammar.productions) {
-    write(production.symbolId, " ");
-    write(grammar.symbols[production.symbolId].name, " => ");
-    writeln(join(map!(s => grammar.symbols[s].name)(production.symbolIds), " "));
+    writeln(grammar.toString(production));
   }
-
-  auto pg = new LR1ParserGenerator(grammar);
-  auto cfsm = pg.buildCFSM();
-  cfsm.printStates();
-  auto gotoTable = pg.buildGotoTable(cfsm);
-  auto actionTable = pg.buildActionTable(cfsm);
 
   TokenInfo[] tokenInfos = grammar.tokenInfos;
   Scanner scanner = new Scanner(tokenInfos, grammar.STOP_ID);
@@ -91,6 +82,7 @@ This line has <strike>strikethrough text</strike>.
 ----- A touch over.
 Some link here [http://somelink.com] with more text.
 Other link here [http://somelink.com Some Link] with bacon.
+
 EOS";
 
 
@@ -109,4 +101,17 @@ EOS";
       writeln("    Group ", i, ": ", group);
     }
   } while (token.id != grammar.STOP_ID);
+
+
+  writeln("== Processing with LRParser ==");
+
+  auto pg = new LR1ParserGenerator(grammar);
+  auto cfsm = pg.buildCFSM();
+  cfsm.printStates();
+  auto gotoTable = pg.buildGotoTable(cfsm);
+  auto actionTable = pg.buildActionTable(cfsm);
+
+  LRParser lrParser = new LRParser(grammar, gotoTable, actionTable);
+  scanner.load(text);
+  lrParser.parse(scanner);
 }

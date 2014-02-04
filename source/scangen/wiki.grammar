@@ -12,7 +12,6 @@
 # Rules are evaluated from top to bottom, so put your generic catch-all tokens
 # at the bottom of the list!
 
-EMPTY_LINE         /^$/
 END_LINE           /$/
 LEVEL_OPEN         /^==+/
 LEVEL_CLOSE        /==+$/
@@ -47,29 +46,33 @@ TEXT               /[^='<\[]+|=+/
 # We use custom format to indicate flags between square brackets '[' and ']'.
 
 START => wiki STOP
-wiki => statement_list
+wiki => block_statements
 
-#statement_list => statement {statement}
-statement_list => statement statement_list_tail
-statement_list_tail =>
-statement_list_tail => statement statement_list_tail
+block_statements =>
+block_statements => block_statement_prefix
+block_statement_prefix => block_statement
+block_statement_prefix => block_statement_prefix block_statement
 
-statement => LEVEL_OPEN statement2_list LEVEL_CLOSE END_LINE
-statement => EMPTY_LINE
-statement => BULLET_LIST statement2_list END_LINE
-statement => NUMBER_LIST statement2_list END_LINE
-statement => statement2_list
+block_statement => LEVEL_OPEN inline_statements LEVEL_CLOSE END_LINE
+block_statement => inline_statements LEVEL_CLOSE END_LINE
+block_statement => LEVEL_OPEN inline_statements END_LINE
+block_statement => BULLET_LIST inline_statements END_LINE
+block_statement => NUMBER_LIST inline_statements END_LINE
+block_statement => HORIZONTAL_RULE inline_statements END_LINE
+block_statement => inline_statements END_LINE
+block_statement => END_LINE
 
-#statement2_list => statement2 {statement2}
-statement2_list => statement2_list_tail
-statement2_list_tail => END_LINE
-statement2_list_tail => statement2 statement2_list_tail
+inline_statements => inline_statement_prefix
+inline_statement_prefix => inline_statement
+inline_statement_prefix => inline_statement_prefix inline_statement
 
-statement2 => LINK
-statement2 => TAG_OPEN statement TAG_CLOSE
-statement2 => TEXT
-statement2 => statement3
+inline_statement => TAG_OPEN text_block TAG_CLOSE
+inline_statement => BOLD text_block BOLD
+inline_statement => ITALIC text_block ITALIC
+inline_statement => BOLD_ITALIC text_block BOLD_ITALIC
+inline_statement => LINK
+inline_statement => TEXT
 
-statement3 => BOLD_ITALIC TEXT BOLD_ITALIC
-statement3 => BOLD TEXT BOLD
-statement3 => ITALIC TEXT ITALIC
+text_block => text_prefix
+text_prefix => TEXT
+text_prefix => text_prefix TEXT

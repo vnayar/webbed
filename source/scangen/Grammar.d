@@ -1,8 +1,9 @@
+import std.algorithm : map;
+import std.array : join, split;
+import std.conv : to;
 import std.regex;
 import std.range;
 import std.stdio;
-import std.conv : to;
-import std.array : split;
 
 import container;
 public import TokenInfo;
@@ -189,8 +190,15 @@ public:
       production.symbolIds ~= nameSymbolIdMap[name];
     }
 
-
     return true;
+  }
+
+  string toString(in Production prod) const
+  {
+    string str = "";
+    str ~= symbols[prod.symbolId].name ~ " => ";
+    str ~= join(map!(s => to!string(symbols[s].name))(prod.symbolIds), " ");
+    return str;
   }
 
   /**

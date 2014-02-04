@@ -10,6 +10,11 @@ class Stack(T)
     return array.length == 0;
   }
 
+  size_t size() const
+  {
+    return array.length;
+  }
+
   void push(T val)
   {
     array ~= val;
@@ -22,6 +27,15 @@ class Stack(T)
   body {
     T val = array[$ - 1];
     array.length--;
+    return val;
+  }
+
+  T top() const
+    in {
+      assert(!empty());
+    }
+  body {
+    T val = array[$-1];
     return val;
   }
 }
